@@ -34,9 +34,11 @@ export default function RaiseQuestionPage() {
     try {
       const tags = form.tags.split(',').map(t => t.trim()).filter(Boolean);
       const res = await rtqService.submitQuestion({ ...form, tags });
+      // FIX #18: RAG returns 'REJECT' or 'ACCEPT', never 'FAQ_MATCH'
       if (res.status === 'REJECT') {
         setPreview(res);
-        setError(`Question rejected: ${res.reason}. ${res.penalty} QP penalty applied.`);
+        const penaltyMsg = res.penalty < 0 ? ` ${res.penalty} QP penalty applied.` : '';
+        setError(`Question rejected: ${res.reason}.${penaltyMsg}`);
       } else {
         navigate('/rtq');
       }
@@ -57,18 +59,22 @@ export default function RaiseQuestionPage() {
               {error}
             </div>
           )}
-          {preview?.status === 'REJECT' && (
-            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm">
-              <strong>Rejected:</strong> {preview.reason}
+
+          {/* FIX #18: Show matched FAQ/RTQ info from the actual RAG response fields */}
+          {preview?.status === 'REJECT' && preview?.matchedFAQ && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm space-y-1">
+              <p><strong>Rejected:</strong> {preview.reason}</p>
+              <p className="text-xs">Similar FAQ: "{preview.matchedFAQ.question}"</p>
+              {preview.matchedRTQ && (
+                <p className="text-xs">Similar question: "{preview.matchedRTQ.question}"</p>
+              )}
+              <p className="text-xs text-yellow-600">
+                FAQ similarity: {(preview.faqScore * 100).toFixed(1)}%
+                {preview.rtqScore !== undefined && ` · RTQ similarity: ${(preview.rtqScore * 100).toFixed(1)}%`}
+              </p>
             </div>
           )}
-          {preview?.status === 'FAQ_MATCH' && (
-            <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg text-sm">
-              <strong>Found similar FAQ:</strong> {preview.matchedQuestion}
-              <br />
-              <span className="text-xs">Similarity: {(preview.similarity * 100).toFixed(1)}% — your question may be a duplicate.</span>
-            </div>
-          )}
+
           <div>
             <label className="block text-sm font-medium text-primary mb-1.5">Your Question</label>
             <textarea

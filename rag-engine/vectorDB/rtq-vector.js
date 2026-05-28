@@ -6,6 +6,10 @@ export class RTQVectorDB {
   async rebuildIndex() {
     const rtqs = await RTQ.find();
     const texts = rtqs.map(r => `${r.question} ${r.category} ${r.tags.join(' ')}`);
+
+    // FIX #11: Rebuild shared IDF vocabulary from the full corpus before embedding
+    embedder.rebuildVocabulary(texts);
+
     const vectors = embedder.embed(texts);
     await Promise.all(rtqs.map((rtq, i) => {
       rtq.vectorEmbedding = vectors[i];

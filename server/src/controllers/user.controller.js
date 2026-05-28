@@ -14,7 +14,6 @@ export async function listUsers(req, res) {
       ];
     }
 
-    // Non-seniors can't see seniors unless they are senior
     if (req.user.role !== 'senior' && req.user.role !== 'admin') {
       filter.role = { $ne: 'senior' };
     }
@@ -102,15 +101,4 @@ export async function removeUser(req, res) {
   }
 }
 
-export async function getLeaderboard(req, res) {
-  try {
-    const users = await User.find({ status: 'active' })
-      .select('name username role qp')
-      .sort({ qp: -1 })
-      .limit(50);
-    res.json(users);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-}
+// FIX #10: Removed duplicate getLeaderboard — use qp.controller.js version only

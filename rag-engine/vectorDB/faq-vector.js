@@ -6,6 +6,10 @@ export class FAQVectorDB {
   async rebuildIndex() {
     const faqs = await FAQ.find();
     const texts = faqs.map(f => `${f.question} ${f.answer} ${f.category} ${f.tags.join(' ')}`);
+
+    // FIX #11: Rebuild shared IDF vocabulary from the full corpus before embedding
+    embedder.rebuildVocabulary(texts);
+
     const vectors = embedder.embed(texts);
     await Promise.all(faqs.map((faq, i) => {
       faq.vectorEmbedding = vectors[i];

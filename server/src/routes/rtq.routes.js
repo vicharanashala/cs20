@@ -9,18 +9,18 @@ import { requireNotRestricted } from '../middleware/qp.middleware.js';
 
 const router = Router();
 
-// ⚠️ Specific paths MUST come before /:id to avoid being captured as an ID param
+// FIX #2: All specific static paths must come before any /:id dynamic segments
 router.get('/', authenticate, listRTQs);
 router.post('/question', authenticate, authorizeRoles('student', 'moderator', 'senior'), requireNotRestricted, submitQuestion);
 router.post('/answer/upvote/:answerId', authenticate, upvoteAnswer);
-
-// Dynamic paths after
-router.get('/:id', authenticate, getRTQ);
-router.post('/:id/answer', authenticate, requireNotRestricted, addAnswer);
 router.patch('/approve-answer/:answerId', authenticate, authorizeRoles('moderator', 'senior', 'admin'), approveAnswer);
 router.patch('/mark-accepted/:id', authenticate, authorizeRoles('moderator', 'senior', 'admin'), markAccepted);
 router.post('/convert/:id', authenticate, authorizeRoles('senior', 'admin'), convertToFAQ);
 router.post('/report/:id', authenticate, reportRTQ);
+
+// Dynamic /:id routes last
+router.get('/:id', authenticate, getRTQ);
+router.post('/:id/answer', authenticate, requireNotRestricted, addAnswer);
 router.delete('/:id', authenticate, authorizeRoles('senior', 'admin'), removeRTQ);
 
 export default router;

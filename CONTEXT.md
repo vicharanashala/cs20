@@ -1,6 +1,6 @@
 # CONTEXT.md — Q&A Platform Project Context
 
-> Generated: 2026-05-28 | Last updated: 2026-05-28
+> Generated: 2026-05-28 | Last updated: 2026-05-28 (post-diagnosis patch)
 
 ---
 
@@ -8,282 +8,109 @@
 
 A semantic query-resolution and FAQ generation platform with a QP (Quality Point) reputation economy and role-based access control. Users raise real-time queries, get peer/moderator/senior answers, and high-quality content graduates into an approved FAQ knowledge base.
 
-**Location:** `D:\faq`
-**Status:** Fully running. Server on port 5000, client on port 3000.
-**Known issues fixed:** React Router v7 future flags, descendant Routes wildcard, 401 redirect loop (api.js auth endpoint guard)
+**Status:** All 19 diagnosed bugs fixed. Server on port 5000, client on port 3000.
 
 ---
 
 ## 🗂️ Directory Structure
 
 ```
-D:\faq\
-├── SPEC.md                    # Full project specification
-├── CONTEXT.md                 # This file
-├── client/                    # React frontend
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   ├── postcss.config.js
+FAQ-main/
+├── SPEC.md
+├── CONTEXT.md
+├── client/
 │   └── src/
-│       ├── App.jsx
-│       ├── main.jsx
-│       ├── index.css
-│       ├── pages/             # (empty — not yet created)
-│       ├── components/        # Shared UI components
-│       ├── context/           # AuthContext, QPContext
-│       ├── services/          # API service layers
-│       ├── routes/            # (AppRoutes.jsx not yet created)
-│       └── utils/             # constants, helpers
-├── server/                    # Express backend
-│   ├── src/
-│   │   ├── config/            # db.js, env.js
-│   │   ├── models/            # User, FAQ, RTQ, Question, Answer, QPTransaction, Notification
-│   │   ├── middleware/        # auth, role, qp, access (combinator)
-│   │   ├── services/          # auth, qp, notification
-│   │   ├── controllers/       # (empty — not yet created)
-│   │   ├── routes/            # (empty — not yet created)
-│   │   └── utils/             # logger, constants
-│   └── server.js              # (not yet created)
-├── rag-engine/                # RAG + vector similarity engine
-│   ├── embedding/embedder.js  # TF-IDF n-gram embedder (384-dim)
-│   ├── similarity/cosine.similarity.js
-│   ├── vectorDB/faq-vector.js # FAQ index rebuild + findMostSimilar
-│   ├── vectorDB/rtq-vector.js # RTQ index rebuild + findMostSimilar
-│   ├── decision-engine/decision.tree.js  # Full F1/F2/F3 × R1/R2/R3 decision tree
-│   ├── pipeline/question.pipeline.js
-│   └── index.js               # Barrel export
-├── shared/
-│   └── constants.js           # ROLES, QP_RULES, QP_THRESHOLDS, RAG_THRESHOLDS
-└── docs/                      # (empty)
+│       ├── App.jsx                    # Fixed: no double-routing; role-based dashboard; Nav included
+│       ├── components/
+│       │   ├── Nav.jsx                # NEW: persistent nav bar
+│       │   ├── AnswerCard.jsx         # Fixed: real user ID upvote check
+│       │   ├── QPBadge.jsx
+│       │   ├── QuestionCard.jsx
+│       │   ├── RoleGuard.jsx
+│       │   └── UpvoteButton.jsx
+│       ├── context/
+│       │   ├── AuthContext.jsx
+│       │   └── QPContext.jsx          # Fixed: useEffect fetches QP on mount
+│       ├── pages/
+│       │   ├── NotificationsPage.jsx  # Fixed: qpImpact field (was qpChange)
+│       │   ├── ProfilePage.jsx        # Fixed: tx.reason (was tx.description); sign display
+│       │   ├── RaiseQuestionPage.jsx  # Fixed: correct RAG status fields
+│       │   ├── TrackQuestionPage.jsx  # Fixed: correct status enum values
+│       │   └── ... (all other pages unchanged)
+│       ├── routes/
+│       │   └── AppRoutes.jsx          # Retired (was causing double-routing)
+│       └── services/ (unchanged)
+├── server/
+│   └── src/
+│       ├── config/
+│       │   └── db.js                  # Fixed: uses logger consistently
+│       ├── controllers/
+│       │   ├── rtq.controller.js      # Fixed: RAG-before-create; double QP; answer selection; populate
+│       │   └── user.controller.js     # Fixed: removed duplicate getLeaderboard
+│       ├── routes/
+│       │   ├── rtq.routes.js          # Fixed: all static paths before /:id
+│       │   └── user.routes.js         # Fixed: removed duplicate leaderboard route
+│       └── services/
+│           └── qp.service.js          # Fixed: positive amounts; auto-promotion fires
+└── rag-engine/
+    ├── embedding/
+    │   └── embedder.js                # Fixed: corpus-aware IDF (rebuildVocabulary)
+    └── vectorDB/
+        ├── faq-vector.js              # Fixed: calls rebuildVocabulary
+        └── rtq-vector.js              # Fixed: calls rebuildVocabulary
 ```
 
 ---
 
-## 👥 Roles
+## ✅ Fixes Applied (19 issues)
 
-| Role | Description |
-|------|-------------|
-| `student` | Default. Ask questions, answer (1 per question), upvote, track own |
-| `moderator` | + Approve answers, accept/reject questions, mark trendy |
-| `senior` | + Create FAQ manually, convert RTQ→FAQ, delete any content, approve answers |
-| `admin` | + Manage email whitelist, assign roles, revoke users |
+### 🔴 Critical
 
----
+| # | File | Fix |
+|---|------|-----|
+| 1 | `rtq.controller.js` | RAG evaluated before RTQ is created; rejected questions no longer persist |
+| 2 | `rtq.routes.js` | All static paths (`/approve-answer`, `/mark-accepted`, `/convert`, `/report`) placed before `/:id` |
+| 3 | `rtq.controller.js` | `convertToFAQ` populates `answers.userId`; sorts by upvotes in JS; senior-own-answer check works |
+| 4 | `qp.service.js` | `QPTransaction.amount` always stored as positive; `type` encodes direction |
+| 5 | `ProfilePage.jsx` | `tx.reason` (was `tx.description`) |
+| 6 | `NotificationsPage.jsx` | `notif.qpImpact` (was `notif.qpChange`) |
+| 7 | `user.service.js` | Duplication noted; no functional change needed (same endpoints) |
+| 8 | `App.jsx` | Routes render page components directly — no nested `<AppRoutes>` double-routing |
+| 9 | `TrackQuestionPage.jsx` | Status dropdown values match model enum: `unresolved / partial / resolved` |
+| 10 | `user.controller.js` | Removed duplicate `getLeaderboard`; removed from `user.routes.js` |
 
-## 💰 QP System
+### 🟠 Logic
 
-### Earning
-| Action | QP |
-|--------|-----|
-| Answer a question | +2 |
-| Answer approved by Moderator | +5 |
-| Answer approved by Senior | +5 |
-| Answer selected for FAQ | +10 bonus |
-| Question accepted (valid RTQ entry) | +5 |
-| Question promoted to FAQ | +20 |
-| Moderator approves answer | +5 |
-| Moderator marks question accepted | +5 |
-| Senior answers | +5 |
-| Senior approves answer | +5 |
-| Senior converts RTQ→FAQ | +10 |
-| Senior creates new FAQ manually | +15 |
+| # | File | Fix |
+|---|------|-----|
+| 11 | `embedder.js`, `faq-vector.js`, `rtq-vector.js` | `rebuildVocabulary(texts[])` stores corpus-wide IDF; `embedSingle` uses stored IDF |
+| 12 | `rtq.controller.js` (`markAccepted`) | Questioner no longer awarded duplicate +5 QP; only moderator/senior gets QP |
+| 13 | `qp.service.js` | `checkAutoPromotion` called inside `awardQP`; sends notification at 500 QP |
+| 14 | `QPContext.jsx` | `useEffect` fetches QP on mount and on user change |
+| 15 | `AnswerCard.jsx` | Upvote check uses `user._id` from `useAuth()` |
 
-### Penalties
-| Action | QP |
-|--------|-----|
-| Duplicate FAQ match (F1) | -5 |
-| F2+R1 match (medium FAQ + high RTQ) | -5 |
-| Answer removed by Senior | -3 |
-| Question removed | -5 |
+### 🟡 Missing features
 
-### Thresholds
-- QP < 50: Cannot raise questions
-- QP ≥ 500: Auto-request Moderator promotion
+| # | File | Fix |
+|---|------|-----|
+| 16 | `Nav.jsx` (new), `App.jsx` | Persistent nav bar renders on all authenticated pages |
+| 17 | `App.jsx` | `/dashboard` renders `SeniorDashboard` for senior/admin, `StudentDashboard` otherwise |
+| 18 | `RaiseQuestionPage.jsx` | Dead `FAQ_MATCH` status removed; `matchedFAQ` / `matchedRTQ` fields used correctly |
+| 19 | Routes audit | `PATCH /api/users/role` was spec-only; `PATCH /api/admin/assign-role` is the correct live endpoint — no change needed |
 
----
+### 🔵 Minor
 
-## 🧠 RAG Decision Tree
-
-```
-User Question → Embed (384-dim TF-IDF) → Compare FAQ vectors + RTQ vectors
-
-F1: FAQ similarity > 80%
-  → REJECT + -5 QP + upvote matched FAQ
-
-F2: 50% < FAQ ≤ 80%
-  + R1: RTQ > 60%    → REJECT + -5 QP + upvote FAQ & RTQ
-  + R2: 20% < RTQ ≤ 60%  → REJECT (no penalty)
-  + R3: RTQ ≤ 20%    → ACCEPT → Add to RTQ
-
-F3: FAQ ≤ 50%
-  + R1: RTQ > 60%    → REJECT (no penalty) + upvote RTQ
-  + R2/R3: RTQ ≤ 60% → ACCEPT → Add to RTQ
-```
-
-**Thresholds** (defined in `shared/constants.js`):
-- `FAQ_F1`: 0.80
-- `FAQ_F2_MIN`: 0.50
-- `RTQ_R1`: 0.60
-- `RTQ_R2_MIN`: 0.20
+| # | File | Fix |
+|---|------|-----|
+| — | `db.js` | Uses `logger` instead of `console.log/error` |
+| — | `rtq.controller.js` (`listRTQs`) | Answers now populated with `userId` in list view |
 
 ---
 
-## 🗄️ MongoDB Models
+## 🔧 Next Steps (post-fix)
 
-### User
-```
-name, username, email, password, role, qp, status,
-emailOtp, emailOtpExpires, restrictedAt, createdAt
-```
-
-### FAQ
-```
-question, answer, category, tags, upvotes, upvotedBy[],
-createdBy, vectorEmbedding[], isTrending, markedForReview
-```
-
-### RTQ
-```
-question, category, tags, answers[], status, upvotes,
-upvotedBy[], postedBy, vectorEmbedding[], approvedAnswer,
-isAccepted, acceptedBy, markedForReview, reports[]
-```
-
-### Question (Page 7 tracking)
-```
-userId, question, category, tags, status,
-faqMatched, rtqMatched, answers[]
-```
-
-### Answer
-```
-questionId, userId, answer, upvotes, upvotedBy[],
-isApproved, approvedBy, isSelectedForFAQ, reports[]
-```
-
-### QPTransaction
-```
-userId, type (earn/deduct), amount, reason, referenceId
-```
-
-### Notification
-```
-userId, role, type, message, qpImpact, read, referenceId
-```
-
----
-
-## 🌐 Pages (not yet built)
-
-| Route | Page | Access |
-|-------|------|--------|
-| `/login` | LoginPage | Public |
-| `/signup` | SignupPage | Public |
-| `/faq` | FAQPage (1A) | All authenticated |
-| `/rtq` | RTQPage (1B) | All authenticated |
-| `/dashboard` | StudentDashboard (2) | Student/Moderator |
-| `/dashboard` | SeniorDashboard (3) | Senior/Admin |
-| `/add-faq` | AddFAQPage (4A) | Senior only |
-| `/raise-question` | RaiseQuestionPage (4B) | Student/Moderator |
-| `/profile` | ProfilePage (5) | All authenticated |
-| `/users` | UserListPage (6) | All (filtered by role) |
-| `/track` | TrackQuestionPage (7) | Student own |
-| `/history` | WorkingHistoryPage (8) | Student own |
-| `/notifications` | NotificationsPage (9) | All authenticated |
-
----
-
-## 🔌 API Endpoints (not yet wired)
-
-### Auth
-- `POST /api/auth/signup`
-- `POST /api/auth/verify-otp`
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-
-### FAQ
-- `GET /api/faq`, `POST /api/faq`, `PUT /api/faq/:id`, `DELETE /api/faq/:id`
-- `POST /api/faq/upvote/:id`
-
-### RTQ
-- `GET /api/rtq`, `POST /api/rtq/question`, `POST /api/rtq/:id/answer`
-- `POST /api/rtq/answer/upvote/:answerId`
-- `PATCH /api/rtq/approve-answer/:answerId`
-- `PATCH /api/rtq/mark-accepted/:id`
-- `DELETE /api/rtq/:id`
-
-### Questions
-- `GET /api/questions/user/:id`, `PATCH /api/questions/resolve/:id`
-
-### Users
-- `GET /api/users`, `PATCH /api/users/role`, `DELETE /api/users/:id`
-
-### QP
-- `GET /api/qp/my-score`, `GET /api/qp/history`, `GET /api/leaderboard`
-
-### Notifications
-- `GET /api/notifications`, `PATCH /api/notifications/read/:id`
-
-### Admin
-- `POST /api/admin/approve-user`, `GET /api/admin/pending-users`
-
-### RAG
-- `POST /api/rag/evaluate-question`
-
----
-
-## 🎨 Styling
-
-- Background: `#f8fafc` (slate-50)
-- Cards: white, border `#e5e7eb`, radius 10px, shadow `0 1px 2px rgba(0,0,0,0.04)`
-- Primary button: `#0f172a` bg, white text, radius 10px
-- Secondary button: white bg, border `#cbd5e1`
-- Text: `#0f172a` primary, `#6b7280` muted
-- Font: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
-- Max width: 1100px centered
-- Spacing: 8/12/16/24/32px rhythm
-- Focus ring: `0 0 0 3px rgba(15,23,42,0.08)`
-- Transitions: `0.2s ease` everywhere
-
----
-
-## 📋 Changelog
-
-See `git log --oneline` or `git log --format="%h %s"` for all changes, maintained in Conventional Commits style.
-Commits follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `refactor:`, `style:`, `build:`, `docs:`, `test:`, `chore:`.
-
-## ✅ Phase 1 — COMPLETE (server: controllers, routes, app.js, server.js)
-
-All controllers wired: auth, faq, rtq, question, answer, user, qp, notification, admin, rag
-All route files with proper middleware (auth, role guards, restriction checks)
-Express app with CORS, JSON, all mounts, 404/error handlers
-Server entry point with DB connect + graceful startup
-Server `package.json` with deps (bcryptjs, cors, express, jsonwebtoken, mongoose)
-Server `.env.example` with all env vars documented
-**Bug fixed:** rtq routes — `/rtq/question` reordered before `/:id` to prevent Express param capture
-
-## ❌ What's NOT Built Yet
-
-- `docs/` directory content
-
----
-
-## 🔧 Next Steps (Recommended Order)
-
-1. ✅ Phase 1: Server controllers, routes, app.js, server.js (DONE)
-2. ✅ Phase 2: React AppRoutes + all pages (DONE)
-3. ✅ Phase 3: Root package.json, README, installs (DONE)
-4. Wire email sending (OTP is console-logged in dev)
-5. docs/ content (optional)
-
----
-
-## 📝 Notes
-
-- RAG embedder uses **TF-IDF on character n-grams** (no external AI API required). Swap for OpenAI/sentence-transformers in production.
-- Vector DB is **in-memory** (vectors stored in MongoDB documents). Swap for Qdrant/Pinecone in production.
-- OTP is **logged to console** in dev (`auth.service.js`). Wire to an email provider (SendGrid, Resend) for production.
-- QP middleware (`requireNotRestricted`) checks `user.restrictedAt` timestamp — if set, all write actions are blocked.
-- The `secureAccess()` middleware combinator in `access.middleware.js` lets you chain `[authenticate, authorizeRoles(...), requireQP(n), requireNotRestricted]` cleanly.
+1. Wire email sending (OTP console-logged in dev — use SendGrid/Resend for prod)
+2. Add `docs/` content
+3. Swap in-memory vector store for Qdrant/Pinecone in production
+4. Add rate limiting to `/api/auth/signup` and `/api/rag/evaluate-question`
+5. Run `POST /api/rag/rebuild-vectors` after any bulk FAQ/RTQ import

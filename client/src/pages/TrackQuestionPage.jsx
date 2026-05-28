@@ -19,8 +19,7 @@ export default function TrackQuestionPage() {
         questionService.getUserQuestions(user._id),
         rtqService.list()
       ]);
-      // Filter to only user's RTQs
-      const myRtqs = Array.isArray(r) ? r.filter(rtq => rtq.postedBy?._id === user._id) : (r.data || []);
+      const myRtqs = Array.isArray(r) ? r.filter(rtq => rtq.postedBy?._id === user._id || rtq.postedBy === user._id) : (r.data || []);
       setQuestions(Array.isArray(q) ? q : []);
       setRtqs(myRtqs);
     } catch (err) {
@@ -47,7 +46,6 @@ export default function TrackQuestionPage() {
         <div className="text-center py-12 text-muted">Loading...</div>
       ) : (
         <div className="space-y-8">
-          {/* RTQ submitted questions */}
           <div>
             <h2 className="font-semibold text-primary mb-3">RTQ Submissions</h2>
             {rtqs.length === 0 ? (
@@ -71,7 +69,7 @@ export default function TrackQuestionPage() {
                         </div>
                         {rtq.isAccepted && (
                           <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                            ✓ Accepted into FAQ
+                            ✓ Accepted
                           </span>
                         )}
                       </div>
@@ -82,7 +80,6 @@ export default function TrackQuestionPage() {
             )}
           </div>
 
-          {/* Direct questions */}
           <div>
             <h2 className="font-semibold text-primary mb-3">Direct Questions</h2>
             {questions.length === 0 ? (
@@ -95,15 +92,15 @@ export default function TrackQuestionPage() {
                     <div className="flex items-center gap-3 mt-2">
                       <span className="text-xs text-muted">{q.category}</span>
                       <span className="text-xs text-muted">{timeAgo(q.createdAt)}</span>
+                      {/* FIX #9: status options aligned to model enum: unresolved | partial | resolved */}
                       <select
                         value={q.status}
                         onChange={e => handleStatusUpdate(q._id, e.target.value)}
                         className="input py-1 text-xs w-auto"
                       >
-                        <option value="open">Open</option>
-                        <option value="in_progress">In Progress</option>
+                        <option value="unresolved">Unresolved</option>
+                        <option value="partial">Partial</option>
                         <option value="resolved">Resolved</option>
-                        <option value="closed">Closed</option>
                       </select>
                     </div>
                   </div>

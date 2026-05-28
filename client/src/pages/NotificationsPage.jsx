@@ -55,6 +55,7 @@ export default function NotificationsPage() {
       new_answer: '💬',
       account_approved: '✅',
       role_changed: '🔄',
+      promotion_eligible: '🎉',
     };
     return icons[type] || '🔔';
   };
@@ -89,9 +90,10 @@ export default function NotificationsPage() {
               <span className="text-xl">{getIcon(notif.type)}</span>
               <div className="flex-1">
                 <p className="text-sm text-primary">{notif.message}</p>
-                {notif.qpChange !== 0 && (
-                  <p className={`text-xs font-semibold mt-0.5 ${notif.qpChange > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                    {notif.qpChange > 0 ? '+' : ''}{notif.qpChange} QP
+                {/* FIX #6: was notif.qpChange — field is notif.qpImpact */}
+                {notif.qpImpact !== 0 && (
+                  <p className={`text-xs font-semibold mt-0.5 ${notif.qpImpact > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    {notif.qpImpact > 0 ? '+' : ''}{notif.qpImpact} QP
                   </p>
                 )}
                 <p className="text-xs text-muted mt-1">{timeAgo(notif.createdAt)}</p>

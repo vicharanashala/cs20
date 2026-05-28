@@ -13,10 +13,12 @@ export async function listRTQs(req, res) {
     const { sort = 'upvotes', filter } = req.query;
     const rtqs = await RTQ.find()
       .populate('postedBy', 'name role')
-      .populate('answers')
+      .populate({
+        path: 'answers',
+        populate: { path: 'userId', select: 'name role' }
+      })
       .sort({ [sort]: -1, createdAt: -1 });
 
-    // Apply filters
     let filtered = rtqs;
     if (filter === 'unresolved') {
       filtered = rtqs.filter(r => r.status === 'open' && !r.isAccepted);
@@ -56,12 +58,21 @@ export async function submitQuestion(req, res) {
       return res.status(400).json({ message: 'question and category are required' });
     }
 
-    // Run RAG evaluation
+    // FIX #1: Run RAG evaluation BEFORE creating the RTQ record
     const result = await evaluateQuestion(question);
 
-    // Build vector embedding
-    const vectorEmbedding = embedder.embedSingle(`${question} ${category} ${(tags || []).join(' ')}`);
+    // If rejected, do NOT persist an RTQ — just apply penalty and return
+    if (result.status === 'REJECT') {
+      if (result.penalty < 0) {
+        await deductQP(req.user._id, Math.abs(result.penalty), `Question rejected: ${result.reason}`, null);
+        await notifyUser(req.user._id, req.user.role, 'question_rejected',
+          `Question rejected (duplicate). ${result.penalty} QP`, result.penalty, null);
+      }
+      return res.status(200).json({ ...result });
+    }
 
+    // ACCEPT — now create the RTQ
+    const vectorEmbedding = embedder.embedSingle(`${question} ${category} ${(tags || []).join(' ')}`);
     const rtq = await RTQ.create({
       question,
       category,
@@ -72,15 +83,6 @@ export async function submitQuestion(req, res) {
       isAccepted: false
     });
 
-    // Apply penalty if rejected with penalty
-    if (result.status === 'REJECT' && result.penalty < 0) {
-      await deductQP(req.user._id, Math.abs(result.penalty), `Question rejected: ${result.reason}`, rtq._id);
-      await notifyUser(req.user._id, req.user.role, 'question_rejected',
-        `Question rejected (duplicate). ${result.penalty} QP`, result.penalty, rtq._id);
-      return res.status(200).json({ ...result, rtqId: rtq._id });
-    }
-
-    // Accept — award QP
     await awardQP(req.user._id, QP_RULES.QUESTION_ACCEPTED, 'Question accepted into RTQ', rtq._id);
     await notifyUser(req.user._id, req.user.role, 'question_accepted',
       `Question accepted and added to RTQ. +${QP_RULES.QUESTION_ACCEPTED} QP`, QP_RULES.QUESTION_ACCEPTED, rtq._id);
@@ -100,7 +102,6 @@ export async function addAnswer(req, res) {
     const rtq = await RTQ.findById(req.params.id);
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
-    // Check if user already answered this RTQ
     const existingAnswer = await Answer.findOne({ questionId: rtq._id, userId: req.user._id });
     if (existingAnswer) {
       return res.status(400).json({ message: 'You have already answered this question' });
@@ -115,13 +116,11 @@ export async function addAnswer(req, res) {
     rtq.answers.push(newAnswer._id);
     await rtq.save();
 
-    // Award QP for answering
     const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_ANSWER : QP_RULES.ANSWER_QUESTION;
     await awardQP(req.user._id, qpAmount, 'Answered a question', newAnswer._id);
     await notifyUser(req.user._id, req.user.role, 'answer_added',
       `You answered a question. +${qpAmount} QP`, qpAmount, newAnswer._id);
 
-    // Notify questioner
     if (rtq.postedBy.toString() !== req.user._id.toString()) {
       await notifyUser(rtq.postedBy, 'student', 'new_answer',
         `Your question received an answer from ${req.user.name}`, 0, rtq._id);
@@ -170,18 +169,15 @@ export async function approveAnswer(req, res) {
     answer.approvedBy = req.user._id;
     await answer.save();
 
-    // Update RTQ approvedAnswer if not set
     if (!rtq.approvedAnswer) {
       rtq.approvedAnswer = answer._id;
       await rtq.save();
     }
 
-    // Award QP
     const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_APPROVE_ANSWER;
     await awardQP(req.user._id, qpAmount, `${req.user.role} approved an answer`, answer._id);
     await awardQP(answer.userId, QP_RULES.ANSWER_APPROVED, 'Answer approved', answer._id);
 
-    // Notify answerer
     await notifyUser(answer.userId, 'student', 'answer_approved',
       `Your answer was approved. +${QP_RULES.ANSWER_APPROVED} QP`, QP_RULES.ANSWER_APPROVED, answer._id);
 
@@ -202,14 +198,12 @@ export async function markAccepted(req, res) {
     rtq.acceptedBy = req.user._id;
     await rtq.save();
 
-    // Award QP
+    // FIX #12: Only award QP to the moderator/senior — questioner already got +5 at submission
     const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_MARK_ACCEPTED;
     await awardQP(req.user._id, qpAmount, `${req.user.role} accepted question`, rtq._id);
-    await awardQP(rtq.postedBy, QP_RULES.QUESTION_ACCEPTED, 'Question accepted', rtq._id);
 
-    // Notify questioner
     await notifyUser(rtq.postedBy, 'student', 'question_accepted',
-      `Your question was accepted. +${QP_RULES.QUESTION_ACCEPTED} QP`, QP_RULES.QUESTION_ACCEPTED, rtq._id);
+      `Your question was accepted by a ${req.user.role}.`, 0, rtq._id);
 
     res.json({ message: 'Question accepted', rtq });
   } catch (err) {
@@ -223,7 +217,6 @@ export async function removeRTQ(req, res) {
     const rtq = await RTQ.findById(req.params.id);
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
-    // Penalize questioner
     await deductQP(rtq.postedBy, Math.abs(QP_RULES.PENALTY_QUESTION_REMOVED),
       'Question removed by senior', rtq._id);
     await notifyUser(rtq.postedBy, 'student', 'question_removed',
@@ -256,20 +249,24 @@ export async function reportRTQ(req, res) {
 
 export async function convertToFAQ(req, res) {
   try {
-    const rtq = await RTQ.findById(req.params.id)
-      .populate({
-        path: 'answers',
-        options: { sort: { upvotes: -1 } }
-      });
+    // FIX #3: Populate answers with userId so we can identify the senior's own answer
+    const rtq = await RTQ.findById(req.params.id).populate({
+      path: 'answers',
+      populate: { path: 'userId', select: '_id name role' }
+    });
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
-    // Auto-select answer: Senior's answer > Senior-approved > Moderator-approved > Most upvotes
+    // FIX #3: Sort answers by upvotes in JS (Mongoose populate options.sort is unreliable)
+    const answers = [...(rtq.answers || [])].sort((a, b) => b.upvotes - a.upvotes);
+
+    // Auto-select: Senior's own answer > Senior-approved > Most upvoted
     let selectedAnswer = null;
-    const answers = rtq.answers || [];
+    let selectedAnswerDoc = null;
 
     for (const ans of answers) {
       if (ans.userId?._id?.toString() === req.user._id.toString()) {
         selectedAnswer = ans.answer;
+        selectedAnswerDoc = ans;
         break;
       }
     }
@@ -277,12 +274,14 @@ export async function convertToFAQ(req, res) {
       for (const ans of answers) {
         if (ans.approvedBy?.toString() === req.user._id.toString()) {
           selectedAnswer = ans.answer;
+          selectedAnswerDoc = ans;
           break;
         }
       }
     }
     if (!selectedAnswer && answers.length > 0) {
-      selectedAnswer = answers[0].answer; // Most upvoted
+      selectedAnswer = answers[0].answer;
+      selectedAnswerDoc = answers[0];
     }
 
     if (!selectedAnswer) {
@@ -297,14 +296,12 @@ export async function convertToFAQ(req, res) {
       createdBy: req.user._id
     });
 
-    // Mark answer as selected for FAQ
-    const topAnswer = answers[0];
-    if (topAnswer) {
-      topAnswer.isSelectedForFAQ = true;
-      await topAnswer.save();
-      await awardQP(topAnswer.userId._id, QP_RULES.ANSWER_SELECTED_FOR_FAQ, 'Answer selected for FAQ', topAnswer._id);
-      await notifyUser(topAnswer.userId._id, 'student', 'answer_selected_for_faq',
-        `Your answer was selected for FAQ. +${QP_RULES.ANSWER_SELECTED_FOR_FAQ} QP`, QP_RULES.ANSWER_SELECTED_FOR_FAQ, topAnswer._id);
+    if (selectedAnswerDoc) {
+      selectedAnswerDoc.isSelectedForFAQ = true;
+      await selectedAnswerDoc.save();
+      await awardQP(selectedAnswerDoc.userId._id, QP_RULES.ANSWER_SELECTED_FOR_FAQ, 'Answer selected for FAQ', selectedAnswerDoc._id);
+      await notifyUser(selectedAnswerDoc.userId._id, 'student', 'answer_selected_for_faq',
+        `Your answer was selected for FAQ. +${QP_RULES.ANSWER_SELECTED_FOR_FAQ} QP`, QP_RULES.ANSWER_SELECTED_FOR_FAQ, selectedAnswerDoc._id);
     }
 
     await awardQP(req.user._id, QP_RULES.SENIOR_CONVERT_RTQ_TO_FAQ, 'Converted RTQ to FAQ', faq._id);

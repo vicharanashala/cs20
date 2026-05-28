@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import { cn, timeAgo } from '../utils/helpers';
 import UpvoteButton from './UpvoteButton';
+import { useAuth } from '../context/AuthContext';
 
 export default function AnswerCard({ answer, onUpvote, showModeratorControls = false, onApprove, onReject }) {
-  const hasUpvoted = answer.upvotedBy?.includes('currentUser');
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  // FIX #15: was hardcoded 'currentUser' string — now checks actual user ID
+  const hasUpvoted = answer.upvotedBy?.some(id =>
+    (id?._id || id)?.toString() === user?._id?.toString()
+  );
 
   return (
     <div className={cn(
@@ -17,17 +21,20 @@ export default function AnswerCard({ answer, onUpvote, showModeratorControls = f
           <div className="flex items-center gap-2 flex-wrap">
             {answer.isApproved && (
               <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600">
-                <CheckCircle className="w-3 h-3" /> Senior Approved
+                <CheckCircle className="w-3 h-3" /> Approved
               </span>
             )}
             <span className="text-xs text-muted">{timeAgo(answer.createdAt)}</span>
           </div>
           <p className="text-sm text-primary leading-relaxed">{answer.answer}</p>
-          {answer.answeredByName && (
+          {answer.userId?.name && (
             <p className="text-xs text-muted">
-              Answered by <span className="font-medium text-primary">{answer.answeredByName}</span>
-              {answer.answeredByRole === 'moderator' && (
+              Answered by <span className="font-medium text-primary">{answer.userId.name}</span>
+              {answer.userId?.role === 'moderator' && (
                 <span className="ml-1 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Moderator</span>
+              )}
+              {answer.userId?.role === 'senior' && (
+                <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Senior</span>
               )}
             </p>
           )}

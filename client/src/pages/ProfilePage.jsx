@@ -65,7 +65,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Profile card */}
       <div className="card p-6 mb-6">
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -100,7 +99,6 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* Change password */}
       <div className="card p-6 mb-6">
         <h3 className="font-semibold text-primary mb-4">Change Password</h3>
         <form onSubmit={handlePasswordChange} className="space-y-3">
@@ -116,7 +114,6 @@ export default function ProfilePage() {
         </form>
       </div>
 
-      {/* QP History */}
       <div className="card p-6">
         <h3 className="font-semibold text-primary mb-4">QP History</h3>
         {loading ? (
@@ -128,11 +125,13 @@ export default function ProfilePage() {
             {history.map(tx => (
               <div key={tx._id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                 <div>
-                  <p className="text-sm text-primary">{tx.description}</p>
+                  {/* FIX #5: was tx.description — field is tx.reason */}
+                  <p className="text-sm text-primary">{tx.reason}</p>
                   <p className="text-xs text-muted">{timeAgo(tx.createdAt)}</p>
                 </div>
-                <span className={`text-sm font-semibold ${tx.amount >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                  {formatQP(tx.amount)}
+                {/* FIX #4: amount is now always positive; type encodes direction */}
+                <span className={`text-sm font-semibold ${tx.type === 'earn' ? 'text-green-600' : 'text-red-500'}`}>
+                  {tx.type === 'earn' ? '+' : '-'}{tx.amount}
                 </span>
               </div>
             ))}
