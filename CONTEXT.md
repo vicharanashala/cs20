@@ -9,7 +9,7 @@
 A semantic query-resolution and FAQ generation platform with a QP (Quality Point) reputation economy and role-based access control. Users raise real-time queries, get peer/moderator/senior answers, and high-quality content graduates into an approved FAQ knowledge base.
 
 **Location:** `D:\faq`
-**Status:** Phase 1 (server) and Phase 2 (client pages) complete — wiring + install remaining
+**Status:** Phase 1 (server), Phase 2 (client pages), Phase 3 (root wiring) complete
 
 ---
 
@@ -263,19 +263,9 @@ Server `package.json` with deps (bcryptjs, cors, express, jsonwebtoken, mongoose
 Server `.env.example` with all env vars documented
 **Bug fixed:** rtq routes — `/rtq/question` reordered before `/:id` to prevent Express param capture
 
-## ✅ Phase 2 — COMPLETE (client: AppRoutes + all 13 pages)
-
-AppRoutes.jsx with full route definitions
-All 13 pages: Login, Signup, FAQPage, RTQPage, StudentDashboard, SeniorDashboard, AddFAQPage, RaiseQuestionPage, ProfilePage, UserListPage, TrackQuestionPage, WorkingHistoryPage, NotificationsPage
-New admin.service.js (was missing)
-Fixed user.service.js and notification.service.js
-Fixed rtq.service.js list handling + added convertToFAQ
-
 ## ❌ What's NOT Built Yet
 
-- Root `package.json` with workspace scripts (concurrently for client+server dev)
-- `README.md`
-- `docs/` content
+- `docs/` directory content
 
 ---
 
@@ -283,10 +273,9 @@ Fixed rtq.service.js list handling + added convertToFAQ
 
 1. ✅ Phase 1: Server controllers, routes, app.js, server.js (DONE)
 2. ✅ Phase 2: React AppRoutes + all pages (DONE)
-3. Create root `package.json` with `npm run dev` scripts (concurrently for client+server)
-4. Write `README.md`
-5. Install dependencies and verify build
-6. Wire email sending (OTP is console-logged in dev)
+3. ✅ Phase 3: Root package.json, README, installs (DONE)
+4. Wire email sending (OTP is console-logged in dev)
+5. docs/ content (optional)
 
 ---
 
