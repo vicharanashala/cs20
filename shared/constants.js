@@ -54,3 +54,15 @@ export const RAG_THRESHOLDS = {
   RTQ_R1: 0.60,
   RTQ_R2_MIN: 0.20
 };
+
+export const FAQ_CATEGORIES = [
+  'Admissions',
+  'Academics',
+  'Placements',
+  'Campus Life',
+  'Fees & Scholarships',
+  'Examinations',
+  'Hostel & Facilities',
+  'Clubs & Activities',
+  'General'
+];

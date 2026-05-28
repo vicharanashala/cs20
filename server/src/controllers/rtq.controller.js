@@ -7,6 +7,9 @@ import { notifyUser } from '../services/notification.service.js';
 import { QP_RULES } from '../../../shared/constants.js';
 import embedder from '../../../rag-engine/embedding/embedder.js';
 import { evaluateQuestion } from '../../../rag-engine/decision-engine/decision.tree.js';
+import { syncRTQInsert, syncRTQDelete, rollbackRTQInsert } from '../services/sync/rtq.sync.service.js';
+import { syncFAQInsert } from '../services/sync/faq.sync.service.js';
+import logger from '../utils/logger.js';
 
 export async function listRTQs(req, res) {
   try {
@@ -82,6 +85,14 @@ export async function submitQuestion(req, res) {
       status: 'open',
       isAccepted: false
     });
+
+    try {
+      await syncRTQInsert(rtq);
+    } catch (vecErr) {
+      logger.error(`[RTQ-Controller] Qdrant sync failed for RTQ ${rtq._id} — rolling back MongoDB`);
+      await rollbackRTQInsert(rtq._id);
+      return res.status(500).json({ message: 'Failed to index question in vector store', error: vecErr.message });
+    }
 
     await awardQP(req.user._id, QP_RULES.QUESTION_ACCEPTED, 'Question accepted into RTQ', rtq._id);
     await notifyUser(req.user._id, req.user.role, 'question_accepted',
@@ -223,6 +234,9 @@ export async function removeRTQ(req, res) {
       `Your question was removed. ${QP_RULES.PENALTY_QUESTION_REMOVED} QP`, QP_RULES.PENALTY_QUESTION_REMOVED, rtq._id);
 
     await RTQ.findByIdAndDelete(req.params.id);
+
+    await syncRTQDelete(req.params.id);
+
     res.json({ message: 'RTQ removed' });
   } catch (err) {
     console.error(err);
@@ -308,6 +322,13 @@ export async function convertToFAQ(req, res) {
     await awardQP(rtq.postedBy, QP_RULES.QUESTION_ADDED_TO_FAQ, 'Question added to FAQ', rtq._id);
     await notifyUser(rtq.postedBy, 'student', 'question_added_to_faq',
       `Your question was added to FAQs. +${QP_RULES.QUESTION_ADDED_TO_FAQ} QP`, QP_RULES.QUESTION_ADDED_TO_FAQ, rtq._id);
+
+    try {
+      await syncRTQDelete(rtq._id);
+      await syncFAQInsert(faq);
+    } catch (vecErr) {
+      logger.error(`[RTQ-Controller] RTQ→FAQ conversion Qdrant sync failed: ${vecErr.message}`);
+    }
 
     res.status(201).json({ message: 'Converted to FAQ', faq });
   } catch (err) {

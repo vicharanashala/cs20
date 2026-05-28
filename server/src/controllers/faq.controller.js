@@ -2,6 +2,8 @@ import FAQ from '../models/FAQ.model.js';
 import { awardQP } from '../services/qp.service.js';
 import { notifyUser } from '../services/notification.service.js';
 import { FAQ_CATEGORIES } from '../../../shared/constants.js';
+import { syncFAQInsert, syncFAQUpdate, syncFAQDelete, rollbackFAQInsert } from '../services/sync/faq.sync.service.js';
+import logger from '../utils/logger.js';
 
 export async function listFAQs(req, res) {
   try {
@@ -50,6 +52,14 @@ export async function createFAQ(req, res) {
       createdBy: req.user._id
     });
 
+    try {
+      await syncFAQInsert(faq);
+    } catch (vecErr) {
+      logger.error(`[FAQ-Controller] Qdrant sync failed for FAQ ${faq._id} — rolling back MongoDB`);
+      await rollbackFAQInsert(faq._id);
+      return res.status(500).json({ message: 'Failed to index FAQ in vector store', error: vecErr.message });
+    }
+
     await awardQP(req.user._id, 15, 'Created new FAQ manually', faq._id);
     await notifyUser(req.user._id, req.user.role, 'faq_created', 'Your new FAQ was created. +15 QP', 15, faq._id);
 
@@ -75,6 +85,9 @@ export async function updateFAQ(req, res) {
     faq.updatedAt = new Date();
 
     await faq.save();
+
+    await syncFAQUpdate(req.params.id, faq);
+
     res.json(faq);
   } catch (err) {
     console.error(err);
@@ -86,6 +99,9 @@ export async function deleteFAQ(req, res) {
   try {
     const faq = await FAQ.findByIdAndDelete(req.params.id);
     if (!faq) return res.status(404).json({ message: 'FAQ not found' });
+
+    await syncFAQDelete(req.params.id);
+
     res.json({ message: 'FAQ deleted' });
   } catch (err) {
     console.error(err);
