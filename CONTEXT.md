@@ -10,7 +10,7 @@ A semantic query-resolution and FAQ generation platform with a QP (Quality Point
 
 **Location:** `D:\faq`
 **Status:** Fully running. Server on port 5000, client on port 3000.
-**Known issues fixed:** React Router v7 future flags + descendant Routes wildcard warnings
+**Known issues fixed:** React Router v7 future flags, descendant Routes wildcard, 401 redirect loop (api.js auth endpoint guard)
 
 ---
 
