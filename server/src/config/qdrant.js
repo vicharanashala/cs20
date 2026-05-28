@@ -98,8 +98,8 @@ export async function validateConnection() {
 
   try {
     await withRetry(async () => {
-      const colInfo = await getClient().getCollection(QDRANT_FAQ_COLLECTION);
-      return colInfo;
+      const exists = await getClient().collectionExists(QDRANT_FAQ_COLLECTION);
+      return exists;
     }, 'validateConnection');
 
     isConnected = true;

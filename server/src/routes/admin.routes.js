@@ -11,25 +11,25 @@ import { authorizeRoles } from '../middleware/role.middleware.js';
 const router = Router();
 
 router.use(authenticate);
-router.use(authorizeRoles('admin'));
 
-router.get('/users', getUsers);
-router.get('/users/:id', getUser);
-router.post('/users', addUser);
-router.patch('/users/:id', updateUser);
-router.delete('/users/:id', deleteUser);
+router.get('/users', authorizeRoles('admin'), getUsers);
+router.get('/users/:id', authorizeRoles('admin'), getUser);
+router.post('/users', authorizeRoles('admin'), addUser);
+router.patch('/users/:id', authorizeRoles('admin'), updateUser);
+router.delete('/users/:id', authorizeRoles('admin'), deleteUser);
 
-router.patch('/users/:id/role', assignRole);
-router.patch('/users/:id/block', blockUser);
-router.patch('/users/:id/unblock', unblockUser);
-router.post('/reactivate', reactivateUser);
+router.patch('/users/:id/role', authorizeRoles('admin'), assignRole);
+router.patch('/assign-role', authorizeRoles('admin'), assignRole);
+router.patch('/users/:id/block', authorizeRoles('admin'), blockUser);
+router.patch('/users/:id/unblock', authorizeRoles('admin'), unblockUser);
+router.post('/reactivate', authorizeRoles('admin'), reactivateUser);
 
-router.get('/pending-users', getPendingUsers);
-router.post('/approve-user', approveUser);
-router.post('/reject-user', rejectUser);
+router.get('/pending-users', authorizeRoles('admin', 'senior'), getPendingUsers);
+router.post('/approve-user', authorizeRoles('admin', 'senior'), approveUser);
+router.post('/reject-user', authorizeRoles('admin', 'senior'), rejectUser);
 
-router.get('/role-requests', getRoleRequests);
-router.post('/role-requests/:requestId/approve', approveRoleRequest);
-router.post('/role-requests/:requestId/reject', rejectRoleRequest);
+router.get('/role-requests', authorizeRoles('admin'), getRoleRequests);
+router.post('/role-requests/:requestId/approve', authorizeRoles('admin'), approveRoleRequest);
+router.post('/role-requests/:requestId/reject', authorizeRoles('admin'), rejectRoleRequest);
 
 export default router;

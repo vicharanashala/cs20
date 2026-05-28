@@ -85,7 +85,8 @@ export async function updateUser(req, res) {
 
 export async function assignRole(req, res) {
   try {
-    const { userId, role } = req.body;
+    const userId = req.params.id || req.body.userId;
+    const { role } = req.body;
     if (!userId || !role) return res.status(400).json({ message: 'userId and role are required' });
 
     const validRoles = ['student', 'moderator', 'senior', 'admin'];
@@ -103,7 +104,7 @@ export async function assignRole(req, res) {
     await notifyUser(userId, role, 'role_changed',
       `Your role has been changed to ${role} by an admin`, 0);
 
-    res.json({ message: `Role assigned: ${role}`, user: user.toJSON() });
+    res.json({ message: `Role assigned: ${role}`, userId: user._id, user: user.toJSON() });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
