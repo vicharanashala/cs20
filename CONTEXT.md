@@ -253,12 +253,17 @@ userId, role, type, message, qpImpact, read, referenceId
 See `git log --oneline` or `git log --format="%h %s"` for all changes, maintained in Conventional Commits style.
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `refactor:`, `style:`, `build:`, `docs:`, `test:`, `chore:`.
 
+## ✅ Phase 1 — COMPLETE (server: controllers, routes, app.js, server.js)
+
+All controllers wired: auth, faq, rtq, question, answer, user, qp, notification, admin, rag
+All route files with proper middleware (auth, role guards, restriction checks)
+Express app with CORS, JSON, all mounts, 404/error handlers
+Server entry point with DB connect + graceful startup
+Server `package.json` with deps (bcryptjs, cors, express, jsonwebtoken, mongoose)
+Server `.env.example` with all env vars documented
+
 ## ❌ What's NOT Built Yet
 
-- `server/src/server.js` — Express entry point
-- `server/src/app.js` — Express app setup with all routes
-- `server/src/controllers/` — All controllers (auth, faq, rtq, question, answer, user, qp, notification, admin, rag)
-- `server/src/routes/` — All route files
 - `client/src/routes/AppRoutes.jsx` — Route definitions for all pages
 - `client/src/pages/` — All page components (Login, Signup, FAQ, RTQ, Dashboards, Raise Question, Profile, Users, Track, History, Notifications)
 - Root `package.json` with workspace scripts
