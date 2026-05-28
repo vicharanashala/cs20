@@ -250,7 +250,8 @@ userId, role, type, message, qpImpact, read, referenceId
 
 ## 📋 Changelog
 
-See `CHANGELOG.md` for all changes, maintained in Conventional Commits style throughout development.
+See `git log --oneline` or `git log --format="%h %s"` for all changes, maintained in Conventional Commits style.
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `refactor:`, `style:`, `build:`, `docs:`, `test:`, `chore:`.
 
 ## ❌ What's NOT Built Yet
 
