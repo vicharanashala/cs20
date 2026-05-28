@@ -3,12 +3,26 @@ import { connectDB } from './config/db.js';
 import { config } from './config/env.js';
 import { validateConnection, isQdrantConnected } from './config/qdrant.js';
 import { initializeAllCollections } from './services/vector/collection.service.js';
+import User from './models/User.model.js';
 import logger from './utils/logger.js';
 
 const start = async () => {
   try {
     await connectDB();
     logger.info('[INFO] MongoDB connected');
+
+    if (process.env.INITIAL_ADMIN_EMAIL) {
+      const adminUser = await User.findOne({ email: process.env.INITIAL_ADMIN_EMAIL.toLowerCase() });
+      if (adminUser && adminUser.role !== 'admin') {
+        adminUser.role = 'admin';
+        await adminUser.save();
+        logger.info(`[ADMIN] Promoted ${process.env.INITIAL_ADMIN_EMAIL} to admin`);
+      } else if (adminUser && adminUser.role === 'admin') {
+        logger.info(`[ADMIN] ${process.env.INITIAL_ADMIN_EMAIL} is already an admin`);
+      } else {
+        logger.warn(`[ADMIN] INITIAL_ADMIN_EMAIL=${process.env.INITIAL_ADMIN_EMAIL} set but no user found with that email`);
+      }
+    }
 
     const qdrantOk = await validateConnection();
     if (qdrantOk) {

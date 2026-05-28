@@ -1,4 +1,4 @@
-import { signupUser, verifyOTP, loginUser, getMe } from '../services/auth.service.js';
+import { signupUser, verifyOTP, loginUser, getMe, requestReAccess } from '../services/auth.service.js';
 
 export async function signup(req, res) {
   try {
@@ -8,7 +8,11 @@ export async function signup(req, res) {
     }
     const result = await signupUser({ name, username, email, password });
     if (result.error) {
-      return res.status(400).json({ message: result.error });
+      return res.status(400).json({
+        message: result.error,
+        blocked: result.blocked || false,
+        userId: result.userId || null
+      });
     }
     res.status(201).json({ userId: result.userId, otp: result.otp, message: 'OTP sent to your email' });
   } catch (err) {
@@ -62,4 +66,21 @@ export async function me(req, res) {
 
 export async function logout(req, res) {
   res.json({ message: 'Logged out successfully' });
+}
+
+export async function requestReAccessUser(req, res) {
+  try {
+    const { userId, name, username, email, password } = req.body;
+    if (!userId || !email || !password) {
+      return res.status(400).json({ message: 'userId, email, and password are required' });
+    }
+    const result = await requestReAccess(userId, { name, username, email, password });
+    if (result.error) {
+      return res.status(400).json({ message: result.error });
+    }
+    res.status(201).json({ requestId: result.requestId, message: result.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
 }
