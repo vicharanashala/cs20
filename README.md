@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Q&A Platform
 
 A semantic query-resolution and FAQ generation platform with a **QP (Quality Point) reputation economy** and **role-based access control**. Built with React, Express, MongoDB, and a custom RAG engine.
@@ -140,3 +141,6 @@ F3: FAQ ≤ 50% similarity
 ---
 
 *Maintained with git. Run `git log --oneline` for full history.*
+=======
+# FAQ
+>>>>>>> 655d58505ffd99f5232d6f5c4fb351452148d89f
