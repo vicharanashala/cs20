@@ -13,6 +13,7 @@ import adminRoutes from './routes/admin.routes.js';
 import ragRoutes from './routes/rag.routes.js';
 import qpRoutes from './routes/qp.routes.js';
 import vectorRoutes from './routes/vector.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/rag', ragRoutes);
 app.use('/api/qp', qpRoutes);
 app.use('/api/vector', vectorRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // 404 handler
 app.use((req, res) => res.status(404).json({ message: 'Route not found' }));

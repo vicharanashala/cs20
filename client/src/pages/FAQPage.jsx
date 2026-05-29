@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import faqService from '../services/faq.service';
 import { useAuth } from '../context/AuthContext';
 import { useQP } from '../context/QPContext';
-import QPBadge from '../components/QPBadge';
 import UpvoteButton from '../components/UpvoteButton';
 import { FAQ_CATEGORIES } from '../utils/constants';
 import { timeAgo } from '../utils/helpers';
+import { SkeletonCard } from '../components/SkeletonLoader';
+import BackToTop from '../components/BackToTop';
+import Breadcrumb from '../components/Breadcrumb';
 
 export default function FAQPage() {
   const [grouped, setGrouped] = useState({});
@@ -14,15 +16,23 @@ export default function FAQPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { refreshQP } = useQP();
+  const limit = 30;
 
-  const loadFAQs = async () => {
+  const loadFAQs = async (pageNum = 1) => {
     setLoading(true);
     try {
-      const res = await faqService.list({ sort: 'upvotes' });
+      const res = await faqService.list({ sort: 'upvotes', category: selectedCategory !== 'all' ? selectedCategory : undefined, page: pageNum, limit });
       setGrouped(res.grouped);
       setCategories(res.categories);
+      if (res.pagination) {
+        setTotal(res.pagination.total);
+        setPage(pageNum);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -30,7 +40,8 @@ export default function FAQPage() {
     }
   };
 
-  useEffect(() => { loadFAQs(); }, []);
+  useEffect(() => { setPage(1); loadFAQs(1); }, [selectedCategory]);
+  useEffect(() => { loadFAQs(page); }, [page]);
 
   const handleUpvote = async (faqId) => {
     const prevGrouped = grouped;
@@ -61,6 +72,24 @@ export default function FAQPage() {
     }
   };
 
+  const handleDelete = async (faqId) => {
+    if (!confirm('Delete this FAQ? This cannot be undone.')) return;
+    const prevGrouped = grouped;
+    setGrouped(prev => {
+      const next = {};
+      for (const [cat, items] of Object.entries(prev)) {
+        next[cat] = items.filter(faq => faq._id !== faqId);
+      }
+      return next;
+    });
+    try {
+      await faqService.remove(faqId);
+    } catch (err) {
+      setGrouped(prevGrouped);
+      alert(err.message || 'Failed to delete FAQ');
+    }
+  };
+
   const filteredCategories = selectedCategory === 'all'
     ? Object.keys(grouped)
     : [selectedCategory];
@@ -75,6 +104,7 @@ export default function FAQPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
+      <Breadcrumb items={[{ label: 'FAQs' }]} />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-primary">FAQ Knowledge Base</h1>
@@ -104,7 +134,9 @@ export default function FAQPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-muted">Loading FAQs...</div>
+        <div className="space-y-4">
+          {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
+        </div>
       ) : (
         <div className="space-y-8">
           {filteredCategories.map(category => {
@@ -125,7 +157,27 @@ export default function FAQPage() {
                           />
                         </div>
                         <div className="flex-1">
-                          <h3 className="font-semibold text-primary mb-1">{faq.question}</h3>
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="font-semibold text-primary mb-1">{faq.question}</h3>
+                            {isSenior && (
+                              <div className="flex gap-1 shrink-0">
+                                <button
+                                  onClick={() => navigate(`/faq/edit/${faq._id}`)}
+                                  className="text-xs px-2 py-1 border border-border rounded text-muted hover:text-primary hover:border-primary transition-colors"
+                                  title="Edit FAQ"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(faq._id)}
+                                  className="text-xs px-2 py-1 border border-red-200 rounded text-red-400 hover:bg-red-50 transition-colors"
+                                  title="Delete FAQ"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           <p className="text-sm text-muted mb-3">{faq.answer}</p>
                           <div className="flex items-center gap-3 text-xs text-muted">
                             <span>By {faq.createdBy?.name}</span>
@@ -143,11 +195,33 @@ export default function FAQPage() {
               </div>
             );
           })}
-          {Object.keys(grouped).length === 0 && (
+          {Object.keys(grouped).length === 0 && !loading && (
             <div className="text-center py-12 text-muted">No FAQs found.</div>
           )}
         </div>
       )}
+
+      {total > limit && (
+        <div className="flex items-center justify-center gap-2 mt-8">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="btn-secondary text-sm px-3 py-1.5"
+          >
+            ← Prev
+          </button>
+          <span className="text-sm text-muted">Page {page}</span>
+          <button
+            onClick={() => setPage(p => Math.min(Math.ceil(total / limit), p + 1))}
+            disabled={page >= Math.ceil(total / limit)}
+            className="btn-secondary text-sm px-3 py-1.5"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+
+      <BackToTop />
     </div>
   );
 }

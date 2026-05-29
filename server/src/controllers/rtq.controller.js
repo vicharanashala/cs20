@@ -9,29 +9,36 @@ import embedder from '../../../rag-engine/embedding/embedder.js';
 import { evaluateQuestion } from '../../../rag-engine/decision-engine/decision.tree.js';
 import { syncRTQInsert, syncRTQDelete, rollbackRTQInsert } from '../services/sync/rtq.sync.service.js';
 import { syncFAQInsert } from '../services/sync/faq.sync.service.js';
+import faqVectorDB from '../../../rag-engine/vectorDB/faq-vector.js';
 import logger from '../utils/logger.js';
 
 export async function listRTQs(req, res) {
   try {
-    const { sort = 'upvotes', filter } = req.query;
-    const rtqs = await RTQ.find()
+    const { sort = 'upvotes', filter, page = 1, limit = 50 } = req.query;
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+
+    let allRtqs = await RTQ.find()
       .populate('postedBy', 'name role')
       .populate({
         path: 'answers',
         populate: { path: 'userId', select: 'name role' }
       })
-      .sort({ [sort]: -1, createdAt: -1 });
+      .sort({ [sort]: -1, createdAt: -1 })
+      .lean();
 
-    let filtered = rtqs;
     if (filter === 'unresolved') {
-      filtered = rtqs.filter(r => r.status === 'open' && !r.isAccepted);
+      allRtqs = allRtqs.filter(r => r.status === 'open' && !r.isAccepted);
     } else if (filter === 'resolved') {
-      filtered = rtqs.filter(r => r.status === 'resolved' || r.isAccepted);
+      allRtqs = allRtqs.filter(r => r.status === 'resolved' || r.isAccepted);
     } else if (filter === 'partial') {
-      filtered = rtqs.filter(r => r.answers.length > 0 && !r.isAccepted);
+      allRtqs = allRtqs.filter(r => r.answers?.length > 0 && !r.isAccepted);
     }
 
-    res.json(filtered);
+    const total = allRtqs.length;
+    const paginated = allRtqs.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+    res.json({ data: paginated, pagination: { page: pageNum, limit: limitNum, total } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -61,20 +68,38 @@ export async function submitQuestion(req, res) {
       return res.status(400).json({ message: 'question and category are required' });
     }
 
-    // FIX #1: Run RAG evaluation BEFORE creating the RTQ record
     const result = await evaluateQuestion(question);
 
-    // If rejected, do NOT persist an RTQ — just apply penalty and return
     if (result.status === 'REJECT') {
       if (result.penalty < 0) {
         await deductQP(req.user._id, Math.abs(result.penalty), `Question rejected: ${result.reason}`, null);
         await notifyUser(req.user._id, req.user.role, 'question_rejected',
           `Question rejected (duplicate). ${result.penalty} QP`, result.penalty, null);
       }
-      return res.status(200).json({ ...result });
+
+      let faqAutoUpvoteDone = false;
+      if (result.shouldAutoUpvoteFAQ && result.autoUpvoteFAQId) {
+        const faqResult = await faqVectorDB.autoUpvoteFAQ(result.autoUpvoteFAQId, req.user._id);
+        if (faqResult.success) {
+          const faqAuthorId = await faqVectorDB.getFAQAuthorId(result.autoUpvoteFAQId);
+          if (faqAuthorId && faqAuthorId.toString() !== req.user._id.toString()) {
+            await awardQP(faqAuthorId, QP_RULES.QUESTION_UPVOTE_BONUS,
+              `Auto-upvote from RAG duplicate detection on FAQ: ${result.matchedFAQ.question.slice(0, 50)}`,
+              result.autoUpvoteFAQId);
+            await notifyUser(faqAuthorId, 'student', 'faq_upvote_received',
+              `Your FAQ received an auto-upvote via RAG duplicate detection. +${QP_RULES.QUESTION_UPVOTE_BONUS} QP`,
+              QP_RULES.QUESTION_UPVOTE_BONUS, result.autoUpvoteFAQId);
+          }
+          logger.info(`[RAG] Auto-upvoted FAQ ${result.autoUpvoteFAQId} for user ${req.user._id} — ${faqResult.reason}`);
+          faqAutoUpvoteDone = true;
+        } else {
+          logger.info(`[RAG] FAQ ${result.autoUpvoteFAQId} auto-upvote skipped: ${faqResult.reason}`);
+        }
+      }
+
+      return res.status(200).json({ ...result, faqAutoUpvoteDone });
     }
 
-    // ACCEPT — now create the RTQ
     const vectorEmbedding = embedder.embedSingle(`${question} ${category} ${(tags || []).join(' ')}`);
     const rtq = await RTQ.create({
       question,
@@ -209,7 +234,6 @@ export async function markAccepted(req, res) {
     rtq.acceptedBy = req.user._id;
     await rtq.save();
 
-    // FIX #12: Only award QP to the moderator/senior — questioner already got +5 at submission
     const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_MARK_ACCEPTED;
     await awardQP(req.user._id, qpAmount, `${req.user.role} accepted question`, rtq._id);
 
@@ -263,17 +287,14 @@ export async function reportRTQ(req, res) {
 
 export async function convertToFAQ(req, res) {
   try {
-    // FIX #3: Populate answers with userId so we can identify the senior's own answer
     const rtq = await RTQ.findById(req.params.id).populate({
       path: 'answers',
       populate: { path: 'userId', select: '_id name role' }
     });
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
-    // FIX #3: Sort answers by upvotes in JS (Mongoose populate options.sort is unreliable)
     const answers = [...(rtq.answers || [])].sort((a, b) => b.upvotes - a.upvotes);
 
-    // Auto-select: Senior's own answer > Senior-approved > Most upvoted
     let selectedAnswer = null;
     let selectedAnswerDoc = null;
 

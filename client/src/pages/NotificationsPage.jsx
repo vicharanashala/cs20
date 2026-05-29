@@ -1,7 +1,9 @@
-// ✅ FIX #2: import useCallback
 import { useState, useEffect, useCallback } from 'react';
 import notificationService from '../services/notification.service';
 import { timeAgo } from '../utils/helpers';
+import { SkeletonRow } from '../components/SkeletonLoader';
+import Breadcrumb from '../components/Breadcrumb';
+import BackToTop from '../components/BackToTop';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
@@ -67,6 +69,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
+      <Breadcrumb items={[{ label: 'Notifications' }]} />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-primary">Notifications</h1>
@@ -80,7 +83,9 @@ export default function NotificationsPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-muted">Loading...</div>
+        <div className="space-y-2">
+          {[1,2,3,4,5].map(i => <SkeletonRow key={i} />)}
+        </div>
       ) : notifications.length === 0 ? (
         <div className="card p-8 text-center text-muted">No notifications yet.</div>
       ) : (
@@ -114,6 +119,7 @@ export default function NotificationsPage() {
           ))}
         </div>
       )}
+      <BackToTop />
     </div>
   );
 }

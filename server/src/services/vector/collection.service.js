@@ -54,7 +54,7 @@ const PARAMS_CONFIG = {
 
 const PAYLOAD_INDEX_CONFIG = {
   'mongoId': {
-    type: 'uuid',
+    type: 'keyword',
   },
   'category': {
     type: 'keyword',
@@ -63,7 +63,7 @@ const PAYLOAD_INDEX_CONFIG = {
     type: 'keyword',
   },
   'createdBy': {
-    type: 'uuid',
+    type: 'keyword',
   },
 };
 
