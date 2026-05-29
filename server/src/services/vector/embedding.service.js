@@ -23,7 +23,7 @@ import logger from '../../utils/logger.js';
 export const CORPUS_FAQ = 'faq';
 export const CORPUS_RTQ = 'rtq';
 
-const USE_TRANSFORMER = true;
+const USE_TRANSFORMER = false;
 
 export async function preprocessText(text) {
   if (!text || typeof text !== 'string') return '';
