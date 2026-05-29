@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+// ✅ FIX #10: import useCallback
+import { useState, useEffect, useCallback } from 'react';
 import rtqService from '../services/rtq.service';
 import { useAuth } from '../context/AuthContext';
 import { useQP } from '../context/QPContext';
@@ -10,20 +11,21 @@ export default function WorkingHistoryPage() {
   const [rtqs, setRtqs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { load(); }, []);
-
-  const load = async () => {
+  // ✅ FIX #10: wrap load in useCallback
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await rtqService.list({ sort: 'createdAt' });
-      // Show all RTQs sorted newest first (senior/admin working history)
       setRtqs(Array.isArray(data) ? data : data.data || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // ✅ FIX #10: add load to dependency array
+  useEffect(() => { load(); }, [load]);
 
   const handleRemove = async (id) => {
     if (!confirm('Remove this RTQ? This cannot be undone.')) return;

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+// ✅ FIX #7: import useCallback
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import QPBadge from '../components/QPBadge';
@@ -14,24 +15,25 @@ export default function StudentDashboard() {
   const [recentRTQs, setRecentRTQs] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const leaderboard = await userService.getLeaderboard();
-        const rank = leaderboard.findIndex(u => u._id === user._id) + 1;
-        const faqs = await faqService.list({ sort: 'upvotes' });
-        const rtqs = await rtqService.list({ filter: 'unresolved' });
-        const notifs = await notificationService.getUnreadCount();
-        setStats({ rank, totalUsers: leaderboard.length });
-        setRecentFAQs(faqs.faqs?.slice(0, 5) || []);
-        setRecentRTQs((rtqs.data || rtqs).slice(0, 5) || []);
-        setUnreadCount(notifs.count || 0);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    load();
-  }, []);
+  // ✅ FIX #7: wrap load in useCallback
+  const load = useCallback(async () => {
+    try {
+      const leaderboard = await userService.getLeaderboard();
+      const rank = leaderboard.findIndex(u => u._id === user._id) + 1;
+      const faqs = await faqService.list({ sort: 'upvotes' });
+      const rtqs = await rtqService.list({ filter: 'unresolved' });
+      const notifs = await notificationService.getUnreadCount();
+      setStats({ rank, totalUsers: leaderboard.length });
+      setRecentFAQs(faqs.faqs?.slice(0, 5) || []);
+      setRecentRTQs((rtqs.data || rtqs).slice(0, 5) || []);
+      setUnreadCount(notifs.count || 0);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [user._id]);
+
+  // ✅ FIX #7: add load to dependency array
+  useEffect(() => { load(); }, [load]);
 
   const quickLinks = [
     { to: '/faq', label: 'Browse FAQs', desc: 'Search the knowledge base', color: 'bg-blue-50 border-blue-200' },

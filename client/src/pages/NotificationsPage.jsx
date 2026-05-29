@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+// ✅ FIX #2: import useCallback
+import { useState, useEffect, useCallback } from 'react';
 import notificationService from '../services/notification.service';
 import { timeAgo } from '../utils/helpers';
 
@@ -6,9 +7,8 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { load(); }, []);
-
-  const load = async () => {
+  // ✅ FIX #3: wrap load in useCallback to avoid stale closure in useEffect
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await notificationService.getNotifications();
@@ -18,7 +18,10 @@ export default function NotificationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // ✅ FIX #3: add load to dependency array
+  useEffect(() => { load(); }, [load]);
 
   const handleMarkRead = async (id) => {
     try {
@@ -90,8 +93,9 @@ export default function NotificationsPage() {
               <span className="text-xl">{getIcon(notif.type)}</span>
               <div className="flex-1">
                 <p className="text-sm text-primary">{notif.message}</p>
-                {/* FIX #6: was notif.qpChange — field is notif.qpImpact */}
-                {notif.qpImpact !== 0 && (
+                {/* ✅ FIX #4: was (notif.qpImpact !== 0) which rendered when field
+                    was undefined/null. Now guards against null/undefined first. */}
+                {notif.qpImpact != null && notif.qpImpact !== 0 && (
                   <p className={`text-xs font-semibold mt-0.5 ${notif.qpImpact > 0 ? 'text-green-600' : 'text-red-500'}`}>
                     {notif.qpImpact > 0 ? '+' : ''}{notif.qpImpact} QP
                   </p>

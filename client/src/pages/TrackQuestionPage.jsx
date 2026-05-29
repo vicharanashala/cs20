@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+// ✅ FIX #8: import useCallback
+import { useState, useEffect, useCallback } from 'react';
 import questionService from '../services/question.service';
 import rtqService from '../services/rtq.service';
 import { useAuth } from '../context/AuthContext';
@@ -10,9 +11,8 @@ export default function TrackQuestionPage() {
   const [rtqs, setRtqs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { load(); }, []);
-
-  const load = async () => {
+  // ✅ FIX #8: wrap load in useCallback
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [q, r] = await Promise.all([
@@ -27,7 +27,10 @@ export default function TrackQuestionPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user._id]);
+
+  // ✅ FIX #8: add load to dependency array
+  useEffect(() => { load(); }, [load]);
 
   const handleStatusUpdate = async (questionId, status) => {
     const prev = questions;
@@ -94,7 +97,6 @@ export default function TrackQuestionPage() {
                     <div className="flex items-center gap-3 mt-2">
                       <span className="text-xs text-muted">{q.category}</span>
                       <span className="text-xs text-muted">{timeAgo(q.createdAt)}</span>
-                      {/* FIX #9: status options aligned to model enum: unresolved | partial | resolved */}
                       <select
                         value={q.status}
                         onChange={e => handleStatusUpdate(q._id, e.target.value)}
