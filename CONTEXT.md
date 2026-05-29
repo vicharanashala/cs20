@@ -1,6 +1,6 @@
 # CONTEXT.md — Q&A Platform Project Context
 
-> Generated: 2026-05-28 | Last updated: 2026-05-29 (FAQ category upvoting & Qdrant UUID fix)
+> Generated: 2026-05-28 | Last updated: 2026-05-29 (FAQ category upvoting, Qdrant UUID fix & chunks 7-10)
 
 ---
 
@@ -8,7 +8,7 @@
 
 A semantic query-resolution and FAQ generation platform with a **QP (Quality Point) reputation economy**, **role-based access control**, **Qdrant Cloud vector search**, and **admin-controlled email whitelist signup**. Users raise real-time queries, get peer/moderator/senior answers, and high-quality content graduates into an approved FAQ knowledge base.
 
-**Status:** All 19 diagnosed bugs fixed. Qdrant Cloud integrated. Admin role system active. Email whitelist signup gate active. Server on port 5000, client on port 3000.
+**Status:** All 19 diagnosed bugs fixed. Qdrant Cloud integrated. Admin role system active. Email whitelist signup gate active. Server on port 5000, client on port 3001.
 
 ---
 
@@ -22,12 +22,14 @@ FAQ-main/
 │   └── src/
 │       ├── App.jsx                    # Role-based dashboard routing; Nav included
 │       ├── components/
-│       │   ├── Nav.jsx                # Persistent nav bar
+│       │   ├── Nav.jsx                # Persistent nav bar; QP badge with animation
 │       │   ├── AnswerCard.jsx         # Real user ID upvote check
 │       │   ├── QPBadge.jsx
 │       │   ├── QuestionCard.jsx
 │       │   ├── RoleGuard.jsx
-│       │   └── UpvoteButton.jsx
+│       │   ├── UpvoteButton.jsx
+│       │   ├── GlobalSearch.jsx       # "/" shortcut → overlay search FAQ+RTQ
+│       │   └── MiniChart.jsx          # SVG sparkline for 7-day trend charts
 │       ├── context/
 │       │   ├── AuthContext.jsx        # JWT role+qp; requestAccess
 │       │   └── QPContext.jsx
@@ -35,12 +37,14 @@ FAQ-main/
 │       │   ├── SignupPage.jsx         # Email whitelist gate + request approval flow
 │       │   ├── UserListPage.jsx       # Admin: Users + Whitelist + Access Requests tabs
 │       │   ├── FAQPage.jsx             # Category upvote buttons + ranked sorting
+│       │   ├── UserProfilePage.jsx    # User profile at /users/:id
 │       │   └── ... (all other pages)
 │       ├── routes/
 │       └── services/
 │           ├── auth.service.js         # requestAccess method
 │           ├── faq.service.js          # listCategoriesRanked, upvoteCategory
-│           └── admin.service.js        # Whitelist + Access Request API
+│           ├── admin.service.js        # Whitelist + Access Request API
+│           └── dashboard.service.js    # Dashboard stats + activity feed
 ├── server/
 │   └── src/
 │       ├── config/
@@ -234,3 +238,11 @@ Then call `getTransformerEmbedder()` instead of the TF-IDF embedder. Model: `Xen
 5. Run `POST /api/vector/rebuild` with `{collection: 'faq'}` or `'rtq'` to reindex after bulk import
 6. Add email sending (SendGrid/Resend) for production OTP delivery
 7. ~~FAQ category upvoting~~ — implemented (v4)
+
+### Chunks Completed (7–10)
+| Chunk | Feature | Files |
+|-------|---------|-------|
+| 7 | User management: confirm dialogs, UserProfilePage | `UserListPage.jsx`, `UserProfilePage.jsx`, `App.jsx` |
+| 8 | Global search overlay (`/` shortcut), RTQ category filter, FAQ sort options | `GlobalSearch.jsx`, `Nav.jsx`, `RTQPage.jsx`, `FAQPage.jsx` |
+| 9 | QP wire-up: Nav QP animation, paginated QP history, `awardQP`/`deductQP` async sync | `QPContext.jsx`, `Nav.jsx`, `ProfilePage.jsx`, `qp.controller.js` |
+| 10 | Dashboard activity feed, 7-day trend sparklines per RTQ/FAQ/Users | `dashboard.routes.js`, `MiniChart.jsx`, `StudentDashboard.jsx`, `SeniorDashboard.jsx` |

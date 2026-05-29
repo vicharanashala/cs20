@@ -3,10 +3,13 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useQP } from '../context/QPContext';
 import QPBadge from '../components/QPBadge';
+import MiniChart from '../components/MiniChart';
 import userService from '../services/user.service';
 import adminService from '../services/admin.service';
 import notificationService from '../services/notification.service';
+import dashboardService from '../services/dashboard.service';
 import { SkeletonCard } from '../components/SkeletonLoader';
+import { timeAgo } from '../utils/helpers';
 
 export default function SeniorDashboard() {
   const { user } = useAuth();
@@ -15,20 +18,25 @@ export default function SeniorDashboard() {
   const [pendingUsers, setPendingUsers] = useState([]);
   const [stats, setStats] = useState({ rank: '-', totalUsers: 0 });
   const [unreadCount, setUnreadCount] = useState(0);
+  const [activity, setActivity] = useState([]);
+  const [trends, setTrends] = useState({ rtq: [], faq: [], users: [] });
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const [pending, leaderboard, notifs] = await Promise.all([
+        const [pending, leaderboard, notifs, actData] = await Promise.all([
           adminService.getPendingUsers(),
           userService.getLeaderboard(),
-          notificationService.getUnreadCount()
+          notificationService.getUnreadCount(),
+          dashboardService.getActivity().catch(() => ({ activity: [], trends: { rtq: [], faq: [], users: [] } })),
         ]);
         const rank = leaderboard.findIndex(u => u._id === user._id) + 1;
         setPendingUsers(pending);
         setStats({ rank, totalUsers: leaderboard.length });
         setUnreadCount(notifs.count || 0);
+        setActivity(actData.activity || []);
+        setTrends(actData.trends || { rtq: [], faq: [], users: [] });
       } catch (err) {
         console.error(err);
       } finally {
@@ -130,8 +138,8 @@ export default function SeniorDashboard() {
         ))}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      {/* Stats with trend charts */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <div className="card p-4 text-center">
           <div className="text-2xl font-bold text-primary">{pendingUsers.length}</div>
           <div className="text-xs text-muted mt-1">Pending Approvals</div>
@@ -145,6 +153,62 @@ export default function SeniorDashboard() {
           <div className="text-xs text-muted mt-1">Unread Notifications</div>
         </div>
       </div>
+
+      {/* 7-day trend sparklines */}
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted">RTQs (7d)</span>
+            <span className="text-xs text-muted">{trends.rtq.reduce((s, d) => s + d.count, 0)} total</span>
+          </div>
+          <MiniChart data={trends.rtq} color="#6366f1" height={36} />
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted">FAQs (7d)</span>
+            <span className="text-xs text-muted">{trends.faq.reduce((s, d) => s + d.count, 0)} total</span>
+          </div>
+          <MiniChart data={trends.faq} color="#10b981" height={36} />
+        </div>
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-muted">New Users (7d)</span>
+            <span className="text-xs text-muted">{trends.users.reduce((s, d) => s + d.count, 0)} total</span>
+          </div>
+          <MiniChart data={trends.users} color="#f59e0b" height={36} />
+        </div>
+      </div>
+
+      {/* Activity feed */}
+      <div className="card p-5">
+        <h2 className="font-semibold text-primary mb-4">Recent Activity</h2>
+        {activity.length === 0 ? (
+          <p className="text-sm text-muted text-center py-4">No recent activity</p>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {activity.map((item, i) => {
+              const icon = item.type === 'rtq' ? '❓' : item.type === 'faq' ? '💡' : item.type === 'user' ? '👤' : '💰';
+              const label = item.type === 'rtq'
+                ? `New RTQ: "${item.question?.slice(0, 50)}"`
+                : item.type === 'faq'
+                ? `New FAQ: "${item.question?.slice(0, 50)}"`
+                : item.type === 'user'
+                ? `New user: ${item.name}`
+                : `QP ${item.type2 === 'earn' ? '+' : '-'}${item.amount}: ${item.reason?.slice(0, 40)}`;
+              return (
+                <div key={i} className="flex items-start gap-3 py-2 border-b border-border last:border-0 text-sm">
+                  <span className="shrink-0 mt-0.5">{icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-primary truncate">{label}</p>
+                    <p className="text-xs text-muted">{timeAgo(item.createdAt)}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      
       </>
       )}
     </div>

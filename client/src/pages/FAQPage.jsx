@@ -18,6 +18,7 @@ export default function FAQPage() {
   const [rankedCategories, setRankedCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('upvotes');
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -29,8 +30,10 @@ export default function FAQPage() {
   const loadFAQs = async (pageNum = 1) => {
     setLoading(true);
     try {
+      const sortMap = { upvotes: 'upvotes', newest: 'createdAt', oldest: 'createdAt' };
+      const sortDir = { upvotes: -1, newest: -1, oldest: 1 };
       const [faqRes, rankedRes] = await Promise.all([
-        faqService.list({ sort: 'upvotes', category: selectedCategory !== 'all' ? selectedCategory : undefined, page: pageNum, limit }),
+        faqService.list({ sort: sortMap[sort], sortDir: sortDir[sort], category: selectedCategory !== 'all' ? selectedCategory : undefined, page: pageNum, limit }),
         faqService.listCategoriesRanked(),
       ]);
       setGrouped(faqRes.grouped);
@@ -47,7 +50,7 @@ export default function FAQPage() {
     }
   };
 
-  useEffect(() => { setPage(1); loadFAQs(1); }, [selectedCategory]);
+  useEffect(() => { setPage(1); loadFAQs(1); }, [selectedCategory, sort]);
   useEffect(() => { loadFAQs(page); }, [page]);
 
   const handleUpvote = async (faqId) => {
@@ -173,6 +176,11 @@ export default function FAQPage() {
         >
           <option value="all">All Categories</option>
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={sort} onChange={e => setSort(e.target.value)} className="input w-auto">
+          <option value="upvotes">Most Upvoted</option>
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
         </select>
       </div>
 

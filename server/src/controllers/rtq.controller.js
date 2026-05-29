@@ -14,7 +14,7 @@ import logger from '../utils/logger.js';
 
 export async function listRTQs(req, res) {
   try {
-    const { sort = 'upvotes', filter, page = 1, limit = 50 } = req.query;
+    const { sort = 'upvotes', filter, category, page = 1, limit = 50 } = req.query;
     const pageNum = Math.max(1, parseInt(page, 10));
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
 
@@ -33,6 +33,10 @@ export async function listRTQs(req, res) {
       allRtqs = allRtqs.filter(r => r.status === 'resolved' || r.isAccepted);
     } else if (filter === 'partial') {
       allRtqs = allRtqs.filter(r => r.answers?.length > 0 && !r.isAccepted);
+    }
+
+    if (category) {
+      allRtqs = allRtqs.filter(r => r.category === category);
     }
 
     const total = allRtqs.length;

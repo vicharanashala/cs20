@@ -83,18 +83,6 @@ const handleRestrict = async (userId) => {
     }
   };
 
-  const handleRemove = async (userId) => {
-    if (!confirm('Remove this user? This cannot be undone.')) return;
-    const prev = users;
-    setUsers(prev => prev.filter(u => u._id !== userId));
-    try {
-      await userService.removeUser(userId);
-    } catch (err) {
-      setUsers(prev);
-      alert(err.message);
-    }
-  };
-
   const handleAssignRole = async (userId, role) => {
     const u = users.find(x => x._id === userId);
     if (!confirm(`Change "${u?.name}"'s role to ${role}?`)) return;
@@ -112,15 +100,6 @@ const handleRestrict = async (userId) => {
     if (!confirm('Remove this user? This cannot be undone.')) return;
     try {
       await userService.removeUser(userId);
-      loadUsers();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleAssignRole = async (userId, role) => {
-    try {
-      await adminService.assignRole({ userId, role });
       loadUsers();
     } catch (err) {
       alert(err.message);

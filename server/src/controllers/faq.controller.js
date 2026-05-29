@@ -19,7 +19,7 @@ export async function listFAQs(req, res) {
       FAQ.countDocuments(filter),
       FAQ.find(filter)
         .populate('createdBy', 'name role')
-        .sort({ [sort]: -1, createdAt: -1 })
+        .sort({ [sort]: sortDir || -1, createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
         .lean(),

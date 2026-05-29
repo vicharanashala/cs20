@@ -7,6 +7,7 @@ import { timeAgo } from '../utils/helpers';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { Spinner } from '../components/SkeletonLoader';
 import BackToTop from '../components/BackToTop';
+import { FAQ_CATEGORIES } from '../utils/constants';
 
 const LIMIT = 20;
 
@@ -14,6 +15,7 @@ export default function RTQPage() {
   const [rtqs, setRtqs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   const [answerForms, setAnswerForms] = useState({});
@@ -26,7 +28,7 @@ export default function RTQPage() {
   const loadRTQs = async (pageNum = 1) => {
     setLoading(true);
     try {
-      const data = await rtqService.list({ sort: 'upvotes', filter, page: pageNum, limit: LIMIT });
+      const data = await rtqService.list({ sort: 'upvotes', filter, page: pageNum, limit: LIMIT, category: categoryFilter });
       const items = Array.isArray(data) ? data : (data.data || []);
       setRtqs(items);
       if (data.pagination) {
@@ -40,7 +42,7 @@ export default function RTQPage() {
     }
   };
 
-  useEffect(() => { setPage(1); loadRTQs(1); }, [filter]);
+  useEffect(() => { setPage(1); loadRTQs(1); }, [filter, categoryFilter]);
 
   useEffect(() => { loadRTQs(page); }, [page]);
 
@@ -129,6 +131,10 @@ export default function RTQPage() {
           <option value="unresolved">Unresolved</option>
           <option value="resolved">Resolved</option>
           <option value="partial">Has Answers</option>
+        </select>
+        <select value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setPage(1); }} className="input w-auto">
+          <option value="">All Categories</option>
+          {FAQ_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
