@@ -1,17 +1,30 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useQP } from '../context/QPContext';
 import notificationService from '../services/notification.service';
 import { timeAgo } from '../utils/helpers';
 
 export default function Nav({ refreshUser }) {
   const { user, logout } = useAuth();
+  const { qp } = useQP();
   const navigate = useNavigate();
   const location = useLocation();
   const [unreadCount, setUnreadCount] = useState(0);
   const [recentNotifs, setRecentNotifs] = useState([]);
   const [bellOpen, setBellOpen] = useState(false);
+  const [qpAnimate, setQpAnimate] = useState(false);
+  const prevQpRef = useRef(qp);
   const bellRef = useRef(null);
+
+  useEffect(() => {
+    if (prevQpRef.current !== qp && user) {
+      setQpAnimate(true);
+      prevQpRef.current = qp;
+      const t = setTimeout(() => setQpAnimate(false), 800);
+      return () => clearTimeout(t);
+    }
+  }, [qp, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -169,7 +182,13 @@ export default function Nav({ refreshUser }) {
             )}
           </div>
 
-          <span className="text-xs text-muted">{user?.qp || 0} QP</span>
+          <span
+            className={`text-xs font-semibold px-2 py-0.5 rounded-md transition-all duration-300 ${
+              qpAnimate ? 'bg-green-100 text-green-700 scale-110' : 'text-muted'
+            }`}
+          >
+            {qp} QP
+          </span>
           <span className="text-xs text-muted">@{user?.username}</span>
           <button onClick={handleLogout} className="btn-secondary text-xs px-3 py-1.5">Logout</button>
         </div>

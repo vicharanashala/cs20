@@ -1,8 +1,10 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import Nav from './components/Nav';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
+import GlobalSearch from './components/GlobalSearch';
 
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
@@ -60,10 +62,23 @@ function AppLayout() {
   const location = useLocation();
   const { user, refreshUser } = useAuth();
   const isPublic = PUBLIC_PATHS.includes(location.pathname);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <div className="min-h-screen bg-surface">
       {user && !isPublic && <Nav refreshUser={refreshUser} />}
+      {searchOpen && <GlobalSearch onClose={() => setSearchOpen(false)} />}
       <Routes>
         <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
         <Route path="/signup" element={<PublicOnly><SignupPage /></PublicOnly>} />

@@ -32,8 +32,20 @@ export function QPProvider({ children }) {
     }
   }, [user?._id, fetchQP]);
 
-  const awardQP = (amount) => setQP(prev => prev + amount);
-  const deductQP = (amount) => setQP(prev => prev - Math.abs(amount));
+  const awardQP = async (amount) => {
+    setQP(prev => prev + amount);
+    try {
+      const score = await qpService.getMyScore();
+      setQP(typeof score === 'number' ? score : score?.qp || 0);
+    } catch { /* silent — next refresh will correct */ }
+  };
+  const deductQP = async (amount) => {
+    setQP(prev => prev - Math.abs(amount));
+    try {
+      const score = await qpService.getMyScore();
+      setQP(typeof score === 'number' ? score : score?.qp || 0);
+    } catch { /* silent — next refresh will correct */ }
+  };
   const syncQP = (newQP) => setQP(newQP);
 
   return (
