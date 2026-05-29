@@ -32,7 +32,8 @@ CHANGELOG.md
 # yarn.lock
 
 # Uploads / media
-uploads/
+uploads/*
+!uploads/.gitkeep
 
 # Test coverage
 coverage/
