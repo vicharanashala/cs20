@@ -26,6 +26,20 @@ import logger from '../../utils/logger.js';
 
 const { rtq: COLLECTION } = getCollectionNames();
 
+function toUUID(id) {
+  if (!id) return id;
+  const str = id.toString();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)) {
+    return str;
+  }
+  if (/^[0-9a-fA-F]{24}$/.test(str)) {
+    const hex = str.padStart(32, '0');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+  }
+  return str;
+}
+
+
 function buildPayload(rtq) {
   return {
     mongoId: rtq._id?.toString() || rtq.mongoId,
@@ -52,7 +66,7 @@ export async function insertRTQVector(rtq) {
       wait: true,
       points: [
         {
-          id: rtq._id.toString(),
+          id: toUUID(rtq._id),
           vector: embedding,
           payload,
         },
@@ -105,7 +119,7 @@ export async function updateRTQVector(rtqId, updates) {
       wait: true,
       points: [
         {
-          id: rtqId.toString(),
+          id: toUUID(rtqId),
           vector: embedding,
           payload,
         },
@@ -121,7 +135,7 @@ export async function deleteRTQVector(rtqId) {
   await withRetry(async () => {
     await getQdrantClient().deletePoints(COLLECTION, {
       wait: true,
-      points: [rtqId.toString()],
+      points: [toUUID(rtqId)],
     });
   }, 'deleteRTQVector');
 
@@ -131,7 +145,7 @@ export async function deleteRTQVector(rtqId) {
 export async function getRTQVector(rtqId) {
   try {
     const result = await getQdrantClient().retrieve(COLLECTION, {
-      ids: [rtqId.toString()],
+      ids: [toUUID(rtqId)],
       with_payload: true,
     });
     return result[0] || null;

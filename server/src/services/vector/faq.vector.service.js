@@ -26,6 +26,20 @@ import logger from '../../utils/logger.js';
 
 const { faq: COLLECTION } = getCollectionNames();
 
+function toUUID(id) {
+  if (!id) return id;
+  const str = id.toString();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)) {
+    return str;
+  }
+  if (/^[0-9a-fA-F]{24}$/.test(str)) {
+    const hex = str.padStart(32, '0');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+  }
+  return str;
+}
+
+
 function buildPayload(faq) {
   return {
     mongoId: faq._id?.toString() || faq.mongoId,
@@ -52,7 +66,7 @@ export async function insertFAQVector(faq) {
       wait: true,
       points: [
         {
-          id: faq._id.toString(),
+          id: toUUID(faq._id),
           vector: embedding,
           payload,
         },
@@ -104,7 +118,7 @@ export async function updateFAQVector(faqId, updates) {
       wait: true,
       points: [
         {
-          id: faqId.toString(),
+          id: toUUID(faqId),
           vector: embedding,
           payload,
         },
@@ -120,7 +134,7 @@ export async function deleteFAQVector(faqId) {
   await withRetry(async () => {
     await getQdrantClient().deletePoints(COLLECTION, {
       wait: true,
-      points: [faqId.toString()],
+      points: [toUUID(faqId)],
     });
   }, 'deleteFAQVector');
 
@@ -130,7 +144,7 @@ export async function deleteFAQVector(faqId) {
 export async function getFAQVector(faqId) {
   try {
     const result = await getQdrantClient().retrieve(COLLECTION, {
-      ids: [faqId.toString()],
+      ids: [toUUID(faqId)],
       with_payload: true,
     });
     return result[0] || null;

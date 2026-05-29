@@ -1,6 +1,6 @@
 # CONTEXT.md — Q&A Platform Project Context
 
-> Generated: 2026-05-28 | Last updated: 2026-05-29 (FAQ category upvoting)
+> Generated: 2026-05-28 | Last updated: 2026-05-29 (FAQ category upvoting & Qdrant UUID fix)
 
 ---
 
@@ -134,6 +134,7 @@ FAQ-main/
 | Q13 | `app.js` | Mounted `/api/vector` routes |
 | Q14 | `rtq.controller.js` | Wired syncRTQInsert on accept, syncRTQDelete on remove, syncRTQDelete+syncFAQInsert on convert |
 | Q15 | `faq.controller.js` | Wired syncFAQInsert on create, syncFAQUpdate on update, syncFAQDelete on delete |
+| Q16 | `services/vector/*.js` | Format MongoDB 24-character ObjectId to standard 36-character UUID for Qdrant point IDs to resolve Bad Request error |
 
 ### 🟡 Admin Role System (NEW — v2)
 
