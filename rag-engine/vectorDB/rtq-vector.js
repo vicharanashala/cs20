@@ -5,12 +5,9 @@ import embedder from '../embedding/embedder.js';
 export class RTQVectorDB {
   async rebuildIndex() {
     const rtqs = await RTQ.find();
-    const texts = rtqs.map(r => `${r.question} ${r.category} ${r.tags.join(' ')}`);
+    const texts = rtqs.map(r => `${r.question} ${r.category} ${(r.tags || []).join(' ')}`);
 
-    // FIX #11: Rebuild shared IDF vocabulary from the full corpus before embedding
-    embedder.rebuildVocabulary(texts);
-
-    const vectors = embedder.embed(texts);
+    const vectors = await embedder.embedAsync(texts);
     await Promise.all(rtqs.map((rtq, i) => {
       rtq.vectorEmbedding = vectors[i];
       return rtq.save();
@@ -28,8 +25,29 @@ export class RTQVectorDB {
     return scored.slice(0, limit);
   }
 
-  async upvoteRTQ(rtqId) {
-    return await RTQ.findByIdAndUpdate(rtqId, { $inc: { upvotes: 1 } }, { new: true });
+  async autoUpvoteRTQ(rtqId, askerUserId) {
+    const rtq = await RTQ.findById(rtqId);
+    if (!rtq) return { success: false, reason: 'RTQ not found' };
+
+    if (rtq.upvotedBy.includes(askerUserId)) {
+      return { success: false, reason: 'already_upvoted', upvotes: rtq.upvotes };
+    }
+
+    const updated = await RTQ.findByIdAndUpdate(
+      rtqId,
+      {
+        $inc: { upvotes: 1 },
+        $addToSet: { upvotedBy: askerUserId }
+      },
+      { new: true }
+    );
+
+    return { success: true, reason: 'auto_upvoted', upvotes: updated.upvotes };
+  }
+
+  async getRTQAuthorId(rtqId) {
+    const rtq = await RTQ.findById(rtqId).select('postedBy');
+    return rtq ? rtq.postedBy : null;
   }
 }
 

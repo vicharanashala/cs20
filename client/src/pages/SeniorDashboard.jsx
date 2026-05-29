@@ -6,16 +6,19 @@ import QPBadge from '../components/QPBadge';
 import userService from '../services/user.service';
 import adminService from '../services/admin.service';
 import notificationService from '../services/notification.service';
+import { SkeletonCard } from '../components/SkeletonLoader';
 
 export default function SeniorDashboard() {
   const { user } = useAuth();
   const { refreshQP } = useQP();
+  const [loading, setLoading] = useState(true);
   const [pendingUsers, setPendingUsers] = useState([]);
   const [stats, setStats] = useState({ rank: '-', totalUsers: 0 });
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
       try {
         const [pending, leaderboard, notifs] = await Promise.all([
           adminService.getPendingUsers(),
@@ -28,6 +31,8 @@ export default function SeniorDashboard() {
         setUnreadCount(notifs.count || 0);
       } catch (err) {
         console.error(err);
+      } finally {
+        setLoading(false);
       }
     };
     load();
@@ -66,6 +71,23 @@ export default function SeniorDashboard() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
+      {loading ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between mb-8">
+            <div className="space-y-2">
+              <div className="h-8 w-48 bg-slate-200 animate-pulse rounded" />
+              <div className="h-4 w-64 bg-slate-100 animate-pulse rounded" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => <div key={i} className="h-24 bg-white animate-pulse rounded-lg" />)}
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {[1,2,3].map(i => <div key={i} className="h-20 bg-white animate-pulse rounded-lg" />)}
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-primary">Senior Dashboard</h1>
@@ -123,6 +145,8 @@ export default function SeniorDashboard() {
           <div className="text-xs text-muted mt-1">Unread Notifications</div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

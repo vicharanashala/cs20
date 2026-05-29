@@ -1,9 +1,11 @@
-// ✅ FIX #10: import useCallback
 import { useState, useEffect, useCallback } from 'react';
 import rtqService from '../services/rtq.service';
 import { useAuth } from '../context/AuthContext';
 import { useQP } from '../context/QPContext';
 import { timeAgo } from '../utils/helpers';
+import { SkeletonCard } from '../components/SkeletonLoader';
+import Breadcrumb from '../components/Breadcrumb';
+import BackToTop from '../components/BackToTop';
 
 export default function WorkingHistoryPage() {
   const { user } = useAuth();
@@ -68,10 +70,13 @@ export default function WorkingHistoryPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
+      <Breadcrumb items={[{ label: 'History' }]} />
       <h1 className="text-2xl font-bold text-primary mb-6">Working History</h1>
 
       {loading ? (
-        <div className="text-center py-12 text-muted">Loading...</div>
+        <div className="space-y-4">
+          {[1,2,3].map(i => <SkeletonCard key={i} />)}
+        </div>
       ) : (
         <div className="space-y-4">
           {rtqs.map(rtq => (
@@ -136,6 +141,7 @@ export default function WorkingHistoryPage() {
           )}
         </div>
       )}
+      <BackToTop />
     </div>
   );
 }

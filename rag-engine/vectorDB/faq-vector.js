@@ -5,12 +5,10 @@ import embedder from '../embedding/embedder.js';
 export class FAQVectorDB {
   async rebuildIndex() {
     const faqs = await FAQ.find();
-    const texts = faqs.map(f => `${f.question} ${f.answer} ${f.category} ${f.tags.join(' ')}`);
+    // Use only question text to match decision tree query behavior
+    const texts = faqs.map(f => f.question);
 
-    // FIX #11: Rebuild shared IDF vocabulary from the full corpus before embedding
-    embedder.rebuildVocabulary(texts);
-
-    const vectors = embedder.embed(texts);
+    const vectors = await embedder.embedAsync(texts);
     await Promise.all(faqs.map((faq, i) => {
       faq.vectorEmbedding = vectors[i];
       return faq.save();
@@ -28,8 +26,29 @@ export class FAQVectorDB {
     return scored.slice(0, limit);
   }
 
-  async upvoteFAQ(faqId) {
-    return await FAQ.findByIdAndUpdate(faqId, { $inc: { upvotes: 1 } }, { new: true });
+  async autoUpvoteFAQ(faqId, askerUserId) {
+    const faq = await FAQ.findById(faqId);
+    if (!faq) return { success: false, reason: 'FAQ not found' };
+
+    if (faq.upvotedBy.includes(askerUserId)) {
+      return { success: false, reason: 'already_upvoted', upvotes: faq.upvotes };
+    }
+
+    const updated = await FAQ.findByIdAndUpdate(
+      faqId,
+      {
+        $inc: { upvotes: 1 },
+        $addToSet: { upvotedBy: askerUserId }
+      },
+      { new: true }
+    );
+
+    return { success: true, reason: 'auto_upvoted', upvotes: updated.upvotes };
+  }
+
+  async getFAQAuthorId(faqId) {
+    const faq = await FAQ.findById(faqId).select('createdBy');
+    return faq ? faq.createdBy : null;
   }
 }
 

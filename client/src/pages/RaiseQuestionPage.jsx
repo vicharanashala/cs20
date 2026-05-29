@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import rtqService from '../services/rtq.service';
 import ragService from '../services/rag.service';
 import { FAQ_CATEGORIES } from '../utils/constants';
+import Breadcrumb from '../components/Breadcrumb';
 
 export default function RaiseQuestionPage() {
   const [form, setForm] = useState({ question: '', category: '', tags: '' });
@@ -51,27 +52,44 @@ export default function RaiseQuestionPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
+      <Breadcrumb items={[{ label: 'RTQ', to: '/rtq' }, { label: 'Ask a Question' }]} />
       <h1 className="text-2xl font-bold text-primary mb-6">Raise a Question</h1>
       <div className="card p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
-          {error && (
+          {error && !preview && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
               {error}
             </div>
           )}
 
-          {/* FIX #18: Show matched FAQ/RTQ info from the actual RAG response fields */}
-          {preview?.status === 'REJECT' && preview?.matchedFAQ && (
-            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm space-y-1">
-              <p><strong>Rejected:</strong> {preview.reason}</p>
-              <p className="text-xs">Similar FAQ: "{preview.matchedFAQ.question}"</p>
-              {preview.matchedRTQ && (
-                <p className="text-xs">Similar question: "{preview.matchedRTQ.question}"</p>
+          {preview?.status === 'REJECT' && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm space-y-2">
+              <div className="flex items-start justify-between">
+                <p className="font-medium">Question rejected: {preview.reason}</p>
+                {preview.penalty < 0 && (
+                  <span className="text-xs text-red-600 font-medium">{preview.penalty} QP</span>
+                )}
+              </div>
+              {preview.matchedFAQ && (
+                <div className="text-xs space-y-1">
+                  <p className="text-yellow-700">Similar FAQ found:</p>
+                  <p className="font-medium text-yellow-900">"{preview.matchedFAQ.question}"</p>
+                  <p className="text-yellow-600">
+                    FAQ similarity: {(preview.faqScore * 100).toFixed(1)}%
+                    {preview.rtqScore !== undefined && ` · RTQ similarity: ${(preview.rtqScore * 100).toFixed(1)}%`}
+                  </p>
+                  {preview.matchedRTQ && (
+                    <p className="text-yellow-700 mt-1">Similar open question: "{preview.matchedRTQ.question}"</p>
+                  )}
+                </div>
               )}
-              <p className="text-xs text-yellow-600">
-                FAQ similarity: {(preview.faqScore * 100).toFixed(1)}%
-                {preview.rtqScore !== undefined && ` · RTQ similarity: ${(preview.rtqScore * 100).toFixed(1)}%`}
-              </p>
+              <button
+                type="button"
+                onClick={() => setPreview(null)}
+                className="text-xs text-yellow-700 hover:text-yellow-900 underline"
+              >
+                Dismiss
+              </button>
             </div>
           )}
 

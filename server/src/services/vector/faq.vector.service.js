@@ -20,26 +20,17 @@
  * See faq.sync.service.js for transactional sync logic with rollback support.
  */
 
+import { createHash } from 'crypto';
 import { getQdrantClient, getCollectionNames, withRetry } from '../../config/qdrant.js';
 import { generateEmbedding, buildFAQText, CORPUS_FAQ } from './embedding.service.js';
 import logger from '../../utils/logger.js';
 
 const { faq: COLLECTION } = getCollectionNames();
 
-function toUUID(id) {
-  if (!id) return id;
-  const str = id.toString();
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)) {
-    return str;
-  }
-  if (/^[0-9a-fA-F]{24}$/.test(str)) {
-    const hex = str.padStart(32, '0');
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
-  }
-  return str;
+function mongoIdToUuid(mongoId) {
+  const hash = createHash('sha1').update(mongoId.toString()).digest('hex');
+  return `${hash.slice(0,8)}-${hash.slice(8,12)}-5${hash.slice(13,16)}-${hash.slice(16,20)}-${hash.slice(20,32)}`;
 }
-
-
 function buildPayload(faq) {
   return {
     mongoId: faq._id?.toString() || faq.mongoId,
@@ -58,7 +49,13 @@ export async function insertFAQVector(faq) {
   }
 
   const text = buildFAQText(faq);
-  const embedding = generateEmbedding(text, CORPUS_FAQ);
+  let embedding = await generateEmbedding(text, CORPUS_FAQ);
+
+  if (!embedding || !Array.isArray(embedding) || embedding.length !== 384 || embedding.some(v => !Number.isFinite(v))) {
+    logger.warn(`[FAQ-Vector] Invalid embedding for FAQ ${faq._id} — using zero vector (text: "${text?.substring(0, 50)}")`);
+    embedding = new Array(384).fill(0);
+  }
+
   const payload = buildPayload(faq);
 
   await withRetry(async () => {
@@ -66,7 +63,7 @@ export async function insertFAQVector(faq) {
       wait: true,
       points: [
         {
-          id: toUUID(faq._id),
+          id: mongoIdToUuid(faq._id.toString()),
           vector: embedding,
           payload,
         },
@@ -104,13 +101,19 @@ export async function searchFAQSimilarity(queryEmbedding, { limit = 5, category 
 }
 
 export async function searchFAQByText(text, { limit = 5, category = null } = {}) {
-  const embedding = generateEmbedding(text, CORPUS_FAQ);
+  const embedding = await generateEmbedding(text, CORPUS_FAQ);
   return searchFAQSimilarity(embedding, { limit, category });
 }
 
 export async function updateFAQVector(faqId, updates) {
   const text = buildFAQText(updates);
-  const embedding = generateEmbedding(text, CORPUS_FAQ);
+  let embedding = await generateEmbedding(text, CORPUS_FAQ);
+
+  if (!embedding || !Array.isArray(embedding) || embedding.length !== 384 || embedding.some(v => !Number.isFinite(v))) {
+    logger.warn(`[FAQ-Vector] Invalid embedding for FAQ ${faqId} update — using zero vector`);
+    embedding = new Array(384).fill(0);
+  }
+
   const payload = buildPayload(updates);
 
   await withRetry(async () => {
@@ -118,7 +121,7 @@ export async function updateFAQVector(faqId, updates) {
       wait: true,
       points: [
         {
-          id: toUUID(faqId),
+          id: mongoIdToUuid(faqId.toString()),
           vector: embedding,
           payload,
         },
@@ -134,7 +137,7 @@ export async function deleteFAQVector(faqId) {
   await withRetry(async () => {
     await getQdrantClient().deletePoints(COLLECTION, {
       wait: true,
-      points: [toUUID(faqId)],
+      points: [mongoIdToUuid(faqId.toString())],
     });
   }, 'deleteFAQVector');
 
@@ -144,7 +147,7 @@ export async function deleteFAQVector(faqId) {
 export async function getFAQVector(faqId) {
   try {
     const result = await getQdrantClient().retrieve(COLLECTION, {
-      ids: [toUUID(faqId)],
+      ids: [mongoIdToUuid(faqId.toString())],
       with_payload: true,
     });
     return result[0] || null;

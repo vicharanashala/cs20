@@ -1,9 +1,9 @@
-// ✅ FIX #8: import useCallback
 import { useState, useEffect, useCallback } from 'react';
 import questionService from '../services/question.service';
 import rtqService from '../services/rtq.service';
 import { useAuth } from '../context/AuthContext';
 import { timeAgo } from '../utils/helpers';
+import Breadcrumb from '../components/Breadcrumb';
 
 export default function TrackQuestionPage() {
   const { user } = useAuth();
@@ -45,6 +45,7 @@ export default function TrackQuestionPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
+      <Breadcrumb items={[{ label: 'Track Questions' }]} />
       <h1 className="text-2xl font-bold text-primary mb-6">Track My Questions</h1>
 
       {loading ? (

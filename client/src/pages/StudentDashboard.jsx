@@ -1,38 +1,37 @@
-// ✅ FIX #7: import useCallback
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import QPBadge from '../components/QPBadge';
-import userService from '../services/user.service';
+import dashboardService from '../services/dashboard.service';
 import faqService from '../services/faq.service';
 import rtqService from '../services/rtq.service';
-import notificationService from '../services/notification.service';
+import { SkeletonCard } from '../components/SkeletonLoader';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({ rank: '-', totalUsers: 0 });
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ rank: '-', totalUsers: 0, unreadCount: 0 });
   const [recentFAQs, setRecentFAQs] = useState([]);
   const [recentRTQs, setRecentRTQs] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  // ✅ FIX #7: wrap load in useCallback
   const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const leaderboard = await userService.getLeaderboard();
-      const rank = leaderboard.findIndex(u => u._id === user._id) + 1;
-      const faqs = await faqService.list({ sort: 'upvotes' });
-      const rtqs = await rtqService.list({ filter: 'unresolved' });
-      const notifs = await notificationService.getUnreadCount();
-      setStats({ rank, totalUsers: leaderboard.length });
+      const [statsData, faqs, rtqs] = await Promise.all([
+        dashboardService.getStats(),
+        faqService.list({ sort: 'upvotes' }),
+        rtqService.list({ filter: 'unresolved' }),
+      ]);
+      setStats({ rank: statsData.rank || '-', totalUsers: statsData.totalUsers || 0, unreadCount: statsData.unreadCount || 0 });
       setRecentFAQs(faqs.faqs?.slice(0, 5) || []);
       setRecentRTQs((rtqs.data || rtqs).slice(0, 5) || []);
-      setUnreadCount(notifs.count || 0);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
-  }, [user._id]);
+  }, []);
 
-  // ✅ FIX #7: add load to dependency array
   useEffect(() => { load(); }, [load]);
 
   const quickLinks = [
@@ -40,12 +39,33 @@ export default function StudentDashboard() {
     { to: '/rtq', label: 'RTQ Board', desc: 'Clarify doubts with the community', color: 'bg-purple-50 border-purple-200' },
     { to: '/raise-question', label: 'Ask a Question', desc: 'Submit a question for review', color: 'bg-orange-50 border-orange-200' },
     { to: '/track', label: 'Track Questions', desc: 'Monitor your raised questions', color: 'bg-green-50 border-green-200' },
-    { to: '/notifications', label: 'Notifications', desc: `${unreadCount} unread`, color: 'bg-yellow-50 border-yellow-200' },
+    { to: '/notifications', label: 'Notifications', desc: `${stats.unreadCount} unread`, color: 'bg-yellow-50 border-yellow-200' },
     { to: '/profile', label: 'My Profile', desc: 'View QP history and stats', color: 'bg-slate-50 border-slate-200' },
   ];
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
+      {loading ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between mb-8">
+            <div className="space-y-2">
+              <div className="h-8 w-48 bg-slate-200 animate-pulse rounded" />
+              <div className="h-4 w-64 bg-slate-100 animate-pulse rounded" />
+            </div>
+            <div className="space-y-2 text-right">
+              <div className="h-6 w-20 bg-slate-200 animate-pulse rounded ml-auto" />
+              <div className="h-3 w-16 bg-slate-100 animate-pulse rounded ml-auto" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {[1,2,3].map(i => <div key={i} className="h-20 bg-white animate-pulse rounded-lg" />)}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[1,2,3,4,5,6].map(i => <div key={i} className="h-24 bg-white animate-pulse rounded-lg" />)}
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -71,7 +91,7 @@ export default function StudentDashboard() {
           <div className="text-xs text-muted mt-1">Open Questions</div>
         </div>
         <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-primary">{unreadCount}</div>
+          <div className="text-2xl font-bold text-primary">{stats.unreadCount}</div>
           <div className="text-xs text-muted mt-1">Unread Notifications</div>
         </div>
       </div>
@@ -120,6 +140,8 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

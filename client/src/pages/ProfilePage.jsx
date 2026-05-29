@@ -5,6 +5,7 @@ import qpService from '../services/qp.service';
 import QPBadge from '../components/QPBadge';
 import { formatQP, timeAgo } from '../utils/helpers';
 import { ROLE_LABELS } from '../utils/constants';
+import Breadcrumb from '../components/Breadcrumb';
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -57,6 +58,7 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
+      <Breadcrumb items={[{ label: 'Profile' }]} />
       <h1 className="text-2xl font-bold text-primary mb-6">My Profile</h1>
 
       {saveMsg && (

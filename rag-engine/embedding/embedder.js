@@ -564,6 +564,26 @@ export class Embedder {
     if (!Array.isArray(texts)) return this.embedSingle(texts, corpusName);
     return texts.map(t => this.embedSingle(t, corpusName));
   }
+
+  /**
+   * SEMANTIC: Async embed using transformer model (all-MiniLM-L6-v2).
+   * Use this for true semantic understanding instead of TF-IDF.
+   */
+  async embedSingleAsync(text, corpusName = null) {
+    try {
+      const { embedText } = await import('./transformer.js');
+      return await embedText(text);
+    } catch (err) {
+      console.error('[Embedder] Transformer failed, falling back to TF-IDF:', err.message);
+      return this.embedSingle(text, corpusName);
+    }
+  }
+
+  async embedAsync(texts, corpusName = null) {
+    if (!Array.isArray(texts)) return this.embedSingleAsync(texts, corpusName);
+    const results = await Promise.all(texts.map(t => this.embedSingleAsync(t, corpusName)));
+    return results;
+  }
 }
 
 export default new Embedder({ dimension: 384 });

@@ -7,22 +7,31 @@ import logger from '../utils/logger.js';
 
 export async function listFAQs(req, res) {
   try {
-    const { category, sort = 'upvotes' } = req.query;
+    const { category, sort = 'upvotes', page = 1, limit = 50 } = req.query;
     const filter = {};
     if (category) filter.category = category;
 
-    const faqs = await FAQ.find(filter)
-      .populate('createdBy', 'name role')
-      .sort({ [sort]: -1, createdAt: -1 });
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+    const skip = (pageNum - 1) * limitNum;
 
-    // Group by category
+    const [total, faqs] = await Promise.all([
+      FAQ.countDocuments(filter),
+      FAQ.find(filter)
+        .populate('createdBy', 'name role')
+        .sort({ [sort]: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),
+    ]);
+
     const grouped = faqs.reduce((acc, faq) => {
       if (!acc[faq.category]) acc[faq.category] = [];
       acc[faq.category].push(faq);
       return acc;
     }, {});
 
-    res.json({ faqs, grouped, categories: FAQ_CATEGORIES });
+    res.json({ faqs, grouped, categories: FAQ_CATEGORIES, pagination: { page: pageNum, limit: limitNum, total } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
