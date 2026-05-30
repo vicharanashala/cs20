@@ -115,7 +115,9 @@ export default function RTQPage() {
           <h1 className="text-2xl font-bold text-primary">Raise to Clarify (RTQ)</h1>
           <p className="text-muted text-sm mt-1">Questions pending clarification</p>
         </div>
-        <Link to="/raise-question" className="btn-primary">+ Ask a Question</Link>
+        {user && ['student', 'moderator'].includes(user.role) && (
+          <Link to="/raise-question" className="btn-primary">+ Ask a Question</Link>
+        )}
       </div>
 
       <div className="flex gap-3 mb-6">
