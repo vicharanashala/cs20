@@ -134,6 +134,7 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
 ### 6. Standardized FAQ/RTQ Categories & Migration Utility
 * **Standardized Categories:** Locked the master list of categories to 10 standardized, clean, non-index-prefixed values across the entire platform in both client utils and shared constants.
 * **Migration Utility:** Created a dedicated database migration tool [migrate-categories.js](file:///d:/FAQs/FAQ/scripts/migrate-categories.js) that cleans up numeric prefixes, maps older categories to correct equivalents, and seeds the `CategoryUpvote` database collection for these 10 clean values.
+* **FAQPage Filter Fix:** Fixed "All Categories" in [FAQPage.jsx](file:///d:/FAQs/FAQ/client/src/pages/FAQPage.jsx) showing only General. Root cause: `filteredCategories` was matching constant-derived names against database-derived `grouped` keys (which still had index prefixes). Fix: use `Object.keys(grouped)` for "All" mode and `FAQ_CATEGORIES` for the dropdown, making the page resilient to any naming format in the database.
 
 ---
 
