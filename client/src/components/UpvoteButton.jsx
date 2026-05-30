@@ -14,8 +14,9 @@ function UpvoteSpinner() {
 export default function UpvoteButton({ upvotes, onUpvote, hasUpvoted }) {
   const [loading, setLoading] = useState(false);
 
-  const handleClick = async () => {
-    if (loading || hasUpvoted) return;
+  const handleClick = async (e) => {
+    e.stopPropagation();
+    if (loading) return;
     setLoading(true);
     try {
       await onUpvote();
@@ -27,7 +28,7 @@ export default function UpvoteButton({ upvotes, onUpvote, hasUpvoted }) {
   return (
     <button
       onClick={handleClick}
-      disabled={hasUpvoted || loading}
+      disabled={loading}
       className={cn(
         'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200',
         hasUpvoted

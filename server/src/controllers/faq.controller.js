@@ -10,7 +10,12 @@ export async function listFAQs(req, res) {
     const { category, sort = 'upvotes', sortDir, page = 1, limit = 30 } = req.query;
     const sortDirNum = sortDir ? parseInt(sortDir, 10) : -1;
     const filter = {};
-    if (category) filter.category = category;
+    if (category) {
+      let normalizedCategory = category.replace(/[\u2010-\u2015\u2212]/g, '-').replace(/\s*-\s*/g, ' - ');
+      const escapedCategory = normalizedCategory.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const categoryPattern = escapedCategory.replace('\\ -\\ ', '\\s*[\\u2010-\\u2015\\u2212\\-]\\s*');
+      filter.category = { $regex: new RegExp(`^(?:\\d+\\.\\s*)?${categoryPattern}$`, 'i') };
+    }
 
     const pageNum = Math.max(1, parseInt(page, 10));
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));

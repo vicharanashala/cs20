@@ -36,7 +36,20 @@ export default function FAQPage() {
         faqService.list({ sort: sortMap[sort], sortDir: sortDir[sort], category: selectedCategory !== 'all' ? selectedCategory : undefined, page: pageNum, limit }),
         faqService.listCategoriesRanked(),
       ]);
-      setGrouped(faqRes.grouped);
+      // Normalize grouped keys: strip numeric prefixes and normalize dashes/spaces (e.g. "9. Rosetta — your internship journal" → "Rosetta - your internship journal")
+      const normalizedGrouped = {};
+      for (const [key, value] of Object.entries(faqRes.grouped)) {
+        let normKey = key.replace(/^\d+\.\s*/, '').trim();
+        // Replace em-dashes (—) or en-dashes (–) with normal hyphens (-)
+        normKey = normKey.replace(/[\u2010-\u2015\u2212]/g, '-');
+        // Standardize spacing around hyphens: replace " - " or "  -  " etc. with " - "
+        normKey = normKey.replace(/\s*-\s*/g, ' - ');
+        
+        normalizedGrouped[normKey] = normalizedGrouped[normKey]
+          ? [...normalizedGrouped[normKey], ...value]
+          : value;
+      }
+      setGrouped(normalizedGrouped);
       setCategories(faqRes.categories);
       setRankedCategories(rankedRes);
       if (faqRes.pagination) {
@@ -133,13 +146,28 @@ export default function FAQPage() {
     }
   };
   const filteredCategories = selectedCategory === 'all'
-    ? sortedCategoryNames.filter(name => grouped[name]?.length > 0)
+    ? [
+        ...sortedCategoryNames.filter(name => grouped[name]?.length > 0),
+        ...Object.keys(grouped).filter(name => grouped[name]?.length > 0 && !sortedCategoryNames.includes(name))
+      ]
     : [selectedCategory];
 
   const searchFiltered = (items) => {
     if (!search) return items;
     const q = search.toLowerCase();
     return items.filter(f => f.question.toLowerCase().includes(q) || f.answer.toLowerCase().includes(q));
+  };
+
+  const sortItems = (items) => {
+    const sorted = [...items];
+    if (sort === 'upvotes') {
+      sorted.sort((a, b) => b.upvotes - a.upvotes);
+    } else if (sort === 'newest') {
+      sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    } else if (sort === 'oldest') {
+      sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    }
+    return sorted;
   };
 
   const getCategoryUpvoteInfo = (categoryName) => {
@@ -175,7 +203,7 @@ export default function FAQPage() {
           className="input w-auto"
         >
           <option value="all">All Categories</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          {FAQ_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={sort} onChange={e => setSort(e.target.value)} className="input w-auto">
           <option value="upvotes">Most Upvoted</option>
@@ -191,7 +219,7 @@ export default function FAQPage() {
       ) : (
         <div className="space-y-8">
           {filteredCategories.map(category => {
-            const items = searchFiltered(grouped[category] || []);
+            const items = sortItems(searchFiltered(grouped[category] || []));
             if (items.length === 0) return null;
             const catInfo = getCategoryUpvoteInfo(category);
             return (
