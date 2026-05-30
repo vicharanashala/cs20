@@ -36,7 +36,11 @@ export async function listRTQs(req, res) {
     }
 
     if (category) {
-      allRtqs = allRtqs.filter(r => r.category === category);
+      let normalizedCategory = category.replace(/[\u2010-\u2015\u2212]/g, '-').replace(/\s*-\s*/g, ' - ');
+      const escapedCategory = normalizedCategory.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const categoryPattern = escapedCategory.replace('\\ -\\ ', '\\s*[\\u2010-\\u2015\\u2212\\-]\\s*');
+      const regex = new RegExp(`^(?:\\d+\\.\\s*)?${categoryPattern}$`, 'i');
+      allRtqs = allRtqs.filter(r => r.category && regex.test(r.category));
     }
 
     const total = allRtqs.length;

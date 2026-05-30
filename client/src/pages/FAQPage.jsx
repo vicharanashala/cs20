@@ -36,10 +36,15 @@ export default function FAQPage() {
         faqService.list({ sort: sortMap[sort], sortDir: sortDir[sort], category: selectedCategory !== 'all' ? selectedCategory : undefined, page: pageNum, limit }),
         faqService.listCategoriesRanked(),
       ]);
-      // Normalize grouped keys: strip numeric prefixes (e.g. "1. About the internship" → "About the internship")
+      // Normalize grouped keys: strip numeric prefixes and normalize dashes/spaces (e.g. "9. Rosetta — your internship journal" → "Rosetta - your internship journal")
       const normalizedGrouped = {};
       for (const [key, value] of Object.entries(faqRes.grouped)) {
-        const normKey = key.replace(/^\d+\.\s*/, '').trim();
+        let normKey = key.replace(/^\d+\.\s*/, '').trim();
+        // Replace em-dashes (—) or en-dashes (–) with normal hyphens (-)
+        normKey = normKey.replace(/[\u2010-\u2015\u2212]/g, '-');
+        // Standardize spacing around hyphens: replace " - " or "  -  " etc. with " - "
+        normKey = normKey.replace(/\s*-\s*/g, ' - ');
+        
         normalizedGrouped[normKey] = normalizedGrouped[normKey]
           ? [...normalizedGrouped[normKey], ...value]
           : value;
