@@ -70,7 +70,7 @@ export default function SignupPage() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-primary">Create Account</h1>
           <p className="text-muted mt-2">
-            {step === 1 && !restricted ? 'Join the Q&A community' : step === 1 && restricted && !accessRequested ? 'Request Access' : step === 1 && accessRequested ? 'Request Submitted' : 'Enter the verification code'}
+            {step === 1 && !restricted ? 'Join the PippaQ community' : step === 1 && restricted && !accessRequested ? 'Request Access' : step === 1 && accessRequested ? 'Request Submitted' : 'Enter the verification code'}
           </p>
         </div>
         <div className="card p-8">

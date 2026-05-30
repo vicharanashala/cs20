@@ -12,6 +12,7 @@ import notificationRoutes from './routes/notification.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import ragRoutes from './routes/rag.routes.js';
 import qpRoutes from './routes/qp.routes.js';
+import categoryUpvoteRoutes from './routes/categoryUpvote.routes.js';
 import vectorRoutes from './routes/vector.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 
@@ -27,6 +28,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().
 
 // Mount API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/faq/categories', categoryUpvoteRoutes);
 app.use('/api/faq', faqRoutes);
 app.use('/api/rtq', rtqRoutes);
 app.use('/api/questions', questionRoutes);

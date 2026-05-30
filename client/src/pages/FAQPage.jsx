@@ -6,6 +6,8 @@ import { useQP } from '../context/QPContext';
 import UpvoteButton from '../components/UpvoteButton';
 import { FAQ_CATEGORIES } from '../utils/constants';
 import { timeAgo } from '../utils/helpers';
+import { ArrowBigUp } from 'lucide-react';
+import { cn } from '../utils/helpers';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import BackToTop from '../components/BackToTop';
 import Breadcrumb from '../components/Breadcrumb';
@@ -13,6 +15,7 @@ import Breadcrumb from '../components/Breadcrumb';
 export default function FAQPage() {
   const [grouped, setGrouped] = useState({});
   const [categories, setCategories] = useState([]);
+  const [rankedCategories, setRankedCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('upvotes');
@@ -29,11 +32,15 @@ export default function FAQPage() {
     try {
       const sortMap = { upvotes: 'upvotes', newest: 'createdAt', oldest: 'createdAt' };
       const sortDir = { upvotes: -1, newest: -1, oldest: 1 };
-      const res = await faqService.list({ sort: sortMap[sort], sortDir: sortDir[sort], category: selectedCategory !== 'all' ? selectedCategory : undefined, page: pageNum, limit });
-      setGrouped(res.grouped);
-      setCategories(res.categories);
-      if (res.pagination) {
-        setTotal(res.pagination.total);
+      const [faqRes, rankedRes] = await Promise.all([
+        faqService.list({ sort: sortMap[sort], sortDir: sortDir[sort], category: selectedCategory !== 'all' ? selectedCategory : undefined, page: pageNum, limit }),
+        faqService.listCategoriesRanked(),
+      ]);
+      setGrouped(faqRes.grouped);
+      setCategories(faqRes.categories);
+      setRankedCategories(rankedRes);
+      if (faqRes.pagination) {
+        setTotal(faqRes.pagination.total);
         setPage(pageNum);
       }
     } catch (err) {
@@ -75,6 +82,39 @@ export default function FAQPage() {
     }
   };
 
+  const handleCategoryUpvote = async (categoryName) => {
+    const prevRanked = rankedCategories;
+
+    // Optimistic update
+    setRankedCategories(prev => {
+      const updated = prev.map(cat => {
+        if (cat.categoryName !== categoryName) return cat;
+        const wasUpvoted = cat.hasUpvoted;
+        return {
+          ...cat,
+          upvotes: wasUpvoted ? Math.max(0, cat.upvotes - 1) : cat.upvotes + 1,
+          hasUpvoted: !wasUpvoted,
+        };
+      });
+      // Re-sort after upvote change
+      updated.sort((a, b) => {
+        if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
+        return new Date(b.lastActivity) - new Date(a.lastActivity);
+      });
+      return updated;
+    });
+
+    try {
+      await faqService.upvoteCategory(categoryName);
+    } catch (err) {
+      setRankedCategories(prevRanked);
+      console.error(err);
+    }
+  };
+
+  // Use ranked category order for display
+  const sortedCategoryNames = rankedCategories.map(c => c.categoryName);
+
   const handleDelete = async (faqId) => {
     if (!confirm('Delete this FAQ? This cannot be undone.')) return;
     const prevGrouped = grouped;
@@ -92,15 +132,18 @@ export default function FAQPage() {
       alert(err.message || 'Failed to delete FAQ');
     }
   };
-
   const filteredCategories = selectedCategory === 'all'
-    ? Object.keys(grouped)
+    ? sortedCategoryNames.filter(name => grouped[name]?.length > 0)
     : [selectedCategory];
 
   const searchFiltered = (items) => {
     if (!search) return items;
     const q = search.toLowerCase();
     return items.filter(f => f.question.toLowerCase().includes(q) || f.answer.toLowerCase().includes(q));
+  };
+
+  const getCategoryUpvoteInfo = (categoryName) => {
+    return rankedCategories.find(c => c.categoryName === categoryName) || { upvotes: 0, hasUpvoted: false };
   };
 
   const isSenior = user?.role === 'senior' || user?.role === 'admin';
@@ -150,9 +193,25 @@ export default function FAQPage() {
           {filteredCategories.map(category => {
             const items = searchFiltered(grouped[category] || []);
             if (items.length === 0) return null;
+            const catInfo = getCategoryUpvoteInfo(category);
             return (
               <div key={category}>
-                <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">{category}</h2>
+                <div className="flex items-center gap-3 mb-3">
+                  <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">{category}</h2>
+                  <button
+                    id={`category-upvote-${category.replace(/[^a-zA-Z0-9]/g, '-')}`}
+                    onClick={() => handleCategoryUpvote(category)}
+                    className={cn(
+                      'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all duration-200 border',
+                      catInfo.hasUpvoted
+                        ? 'bg-green-50 text-green-700 border-green-200'
+                        : 'bg-surface text-muted border-border hover:bg-slate-100 hover:text-primary'
+                    )}
+                  >
+                    <ArrowBigUp className={cn('w-3.5 h-3.5', catInfo.hasUpvoted && 'fill-green-600')} />
+                    <span>{catInfo.upvotes}</span>
+                  </button>
+                </div>
                 <div className="space-y-3">
                   {items.map(faq => (
                     <div key={faq._id} className="card p-5">

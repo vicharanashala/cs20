@@ -1,3 +1,6 @@
+import dns from 'dns';
+dns.setServers(['8.8.8.8', '8.8.4.4']);
+
 import app from './app.js';
 import { connectDB } from './config/db.js';
 import { config } from './config/env.js';
@@ -30,6 +33,15 @@ const start = async () => {
       logger.info('[INFO] Qdrant collections initialized');
     } else {
       logger.warn('[WARN] Qdrant not connected — vector services unavailable. Set QDRANT_URL and QDRANT_API_KEY in .env');
+    }
+
+    // Warm up the Sentence Transformer model so the first request isn't slow
+    try {
+      const { warmup } = await import('./services/vector/transformer.service.js');
+      await warmup();
+      logger.info('[INFO] Transformer model warmed up');
+    } catch (warmupErr) {
+      logger.warn('[WARN] Transformer warmup failed — model will load on first request:', warmupErr.message);
     }
 
     app.listen(config.PORT, () => {

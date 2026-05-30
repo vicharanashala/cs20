@@ -5,11 +5,11 @@ import User from '../models/User.model.js';
 import { awardQP, deductQP } from '../services/qp.service.js';
 import { notifyUser } from '../services/notification.service.js';
 import { QP_RULES } from '../../../shared/constants.js';
-import embedder from '../../../rag-engine/embedding/embedder.js';
+import { generateEmbedding } from '../services/vector/embedding.service.js';
 import { evaluateQuestion } from '../../../rag-engine/decision-engine/decision.tree.js';
 import { syncRTQInsert, syncRTQDelete, rollbackRTQInsert } from '../services/sync/rtq.sync.service.js';
 import { syncFAQInsert } from '../services/sync/faq.sync.service.js';
-import faqVectorDB from '../../../rag-engine/vectorDB/faq-vector.js';
+import { autoUpvoteFAQ, autoUpvoteRTQ, getFAQAuthorId, getRTQAuthorId } from '../services/autoupvote.service.js';
 import logger from '../utils/logger.js';
 
 export async function listRTQs(req, res) {
@@ -83,9 +83,9 @@ export async function submitQuestion(req, res) {
 
       let faqAutoUpvoteDone = false;
       if (result.shouldAutoUpvoteFAQ && result.autoUpvoteFAQId) {
-        const faqResult = await faqVectorDB.autoUpvoteFAQ(result.autoUpvoteFAQId, req.user._id);
+        const faqResult = await autoUpvoteFAQ(result.autoUpvoteFAQId, req.user._id);
         if (faqResult.success) {
-          const faqAuthorId = await faqVectorDB.getFAQAuthorId(result.autoUpvoteFAQId);
+          const faqAuthorId = await getFAQAuthorId(result.autoUpvoteFAQId);
           if (faqAuthorId && faqAuthorId.toString() !== req.user._id.toString()) {
             await awardQP(faqAuthorId, QP_RULES.QUESTION_UPVOTE_BONUS,
               `Auto-upvote from RAG duplicate detection on FAQ: ${result.matchedFAQ.question.slice(0, 50)}`,
@@ -101,10 +101,31 @@ export async function submitQuestion(req, res) {
         }
       }
 
-      return res.status(200).json({ ...result, faqAutoUpvoteDone });
+      // RTQ auto-upvote (F3+R1 case)
+      let rtqAutoUpvoteDone = false;
+      if (result.shouldAutoUpvoteRTQ && result.autoUpvoteRTQId) {
+        const rtqResult = await autoUpvoteRTQ(result.autoUpvoteRTQId, req.user._id);
+        if (rtqResult.success) {
+          const rtqAuthorId = await getRTQAuthorId(result.autoUpvoteRTQId);
+          if (rtqAuthorId && rtqAuthorId.toString() !== req.user._id.toString()) {
+            await awardQP(rtqAuthorId, QP_RULES.QUESTION_UPVOTE_BONUS,
+              `Auto-upvote from RAG duplicate detection on RTQ: ${result.matchedRTQ.question.slice(0, 50)}`,
+              result.autoUpvoteRTQId);
+            await notifyUser(rtqAuthorId, 'student', 'rtq_upvote_received',
+              `Your RTQ received an auto-upvote via RAG duplicate detection. +${QP_RULES.QUESTION_UPVOTE_BONUS} QP`,
+              QP_RULES.QUESTION_UPVOTE_BONUS, result.autoUpvoteRTQId);
+          }
+          logger.info(`[RAG] Auto-upvoted RTQ ${result.autoUpvoteRTQId} for user ${req.user._id} — ${rtqResult.reason}`);
+          rtqAutoUpvoteDone = true;
+        } else {
+          logger.info(`[RAG] RTQ ${result.autoUpvoteRTQId} auto-upvote skipped: ${rtqResult.reason}`);
+        }
+      }
+
+      return res.status(200).json({ ...result, faqAutoUpvoteDone, rtqAutoUpvoteDone });
     }
 
-    const vectorEmbedding = embedder.embedSingle(`${question} ${category} ${(tags || []).join(' ')}`);
+    const vectorEmbedding = await generateEmbedding(`${question} ${category} ${(tags || []).join(' ')}`);
     const rtq = await RTQ.create({
       question,
       category,

@@ -1,17 +1,18 @@
-<<<<<<< HEAD
-# Q&A Platform
+# PippaQ — Premium Q&A & FAQ Platform
 
-A semantic query-resolution and FAQ generation platform with a **QP (Quality Point) reputation economy** and **role-based access control**. Built with React, Express, MongoDB, and a custom RAG engine.
+A high-performance, semantic query-resolution and FAQ generation platform with a **QP (Quality Point) reputation economy**, **role-based access control**, and a production-ready **RAG (Retrieval-Augmented Generation) duplicate detection engine**.
+
+Built with React, Express, MongoDB, Qdrant Cloud, and local Sentence Transformers.
 
 ---
 
 ## 🏗️ Architecture
 
-```
+```text
 D:\faq\
-├── client/          React + Vite frontend (Tailwind CSS)
-├── server/          Express.js backend (MongoDB/Mongoose)
-├── rag-engine/      Custom TF-IDF RAG pipeline (no external AI API)
+├── client/          React + Vite frontend (Tailwind CSS + Premium Typography)
+├── server/          Express.js backend (MongoDB/Mongoose + Qdrant Integration)
+├── rag-engine/      Semantic Decision Engine (Sentence Transformer + Qdrant ANN)
 ├── shared/          Shared constants (QP rules, RAG thresholds, roles)
 └── docs/            Project documentation
 ```
@@ -30,12 +31,12 @@ npm run install:all
 
 ```bash
 cp server/.env.example server/.env
-# Edit server/.env — set your MongoDB URI and JWT secret
+# Edit server/.env — set your MongoDB URI, JWT secret, and QDRANT_URL
 ```
 
-### 3. Start MongoDB
+### 3. Start MongoDB & Qdrant
 
-Make sure MongoDB is running locally or update `MONGO_URI` in `server/.env`.
+Ensure your local or cloud MongoDB and Qdrant instances are accessible.
 
 ### 4. Run the app
 
@@ -43,8 +44,8 @@ Make sure MongoDB is running locally or update `MONGO_URI` in `server/.env`.
 npm run dev
 ```
 
-- **Client**: http://localhost:3000
-- **Server**: http://localhost:5000
+* **Client**: http://localhost:3000
+* **Server**: http://localhost:5000
 
 ---
 
@@ -80,29 +81,41 @@ npm run dev
 | Question removed | -5 |
 
 ### Thresholds
-- **QP < 50** → Cannot raise questions
-- **QP ≥ 500** → Auto-request Moderator promotion
+* **QP < 50** → Cannot raise questions.
+* **QP ≥ 500** → Auto-request Moderator promotion.
 
 ---
 
-## 🧠 RAG Decision Tree
+## 🧠 RAG Duplicate Detection Engine
 
-Questions are evaluated against the FAQ and RTQ vector stores:
+Questions are evaluated semantically against the FAQ and RTQ collections stored in Qdrant:
 
+```text
+User Question 
+      │
+      ▼
+Generate Embedding ──► Local Sentence Transformer (all-MiniLM-L6-v2, 384-dim)
+      │
+      ▼
+Qdrant HNSW ANN Search ──► Compare with FAQ/RTQ Collections
+      │
+      ▼
+Apply Decision Tree Rules:
+┌───────────────────────────────┬───────────────────────────────┐
+│ F1: FAQ similarity > 80%      │ REJECT, -5 QP, upvote FAQ     │
+├───────────────────────────────┼───────────────────────────────┤
+│ F2: FAQ similarity 50–80%     │                               │
+│  ├── R1: RTQ > 60%            │ REJECT, -5 QP, upvote FAQ     │
+│  ├── R2: RTQ 20–60%           │ REJECT (no penalty)           │
+│  └── R3: RTQ ≤ 20%            │ ACCEPT → Route to RTQ         │
+├───────────────────────────────┼───────────────────────────────┤
+│ F3: FAQ similarity ≤ 50%      │                               │
+│  ├── R1: RTQ > 60%            │ REJECT (no penalty), upvote RTQ│
+│  └── R2/R3: RTQ ≤ 60%         │ ACCEPT → Route to RTQ         │
+└───────────────────────────────┴───────────────────────────────┘
 ```
-User Question → TF-IDF Embed (384-dim) → Compare with FAQ/RTQ vectors
 
-F1: FAQ similarity > 80%   → REJECT + -5 QP (duplicate)
-F2: 50–80% FAQ similarity
-  + R1: RTQ > 60%          → REJECT + -5 QP (similar RTQ exists)
-  + R2: 20–60% RTQ         → REJECT (no penalty)
-  + R3: RTQ ≤ 20%          → ACCEPT → Add to RTQ
-F3: FAQ ≤ 50% similarity
-  + R1: RTQ > 60%          → REJECT (no penalty)
-  + R2/R3: RTQ ≤ 60%       → ACCEPT → Add to RTQ
-```
-
-> Uses TF-IDF character n-grams (no external AI API required). Swap for OpenAI/sentence-transformers in production.
+> **Performance Optimization:** Includes an **LRU Embedding Cache** (500 entries) and model warmup on server startup to ensure lightning-fast semantic queries under 10ms.
 
 ---
 
@@ -124,23 +137,8 @@ F3: FAQ ≤ 50% similarity
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React 18, Vite, React Router v6, Axios, Tailwind CSS
-- **Backend**: Express.js, Mongoose, JWT (bcryptjs for passwords)
-- **RAG Engine**: Custom TF-IDF n-gram embedder (384-dim), cosine similarity, in-memory vector DB
-- **Database**: MongoDB (vectors stored in documents — swap for Qdrant/Pinecone in production)
-- **Dev**: `concurrently` to run client + server together
-
----
-
-## 📝 Notes
-
-- OTP is **console-logged** in development. Wire to an email provider (SendGrid, Resend) for production.
-- Vector DB is **in-memory** (vectors stored in MongoDB documents). For production, swap to Qdrant or Pinecone.
-- RESTRICTED users (flagged by seniors) are blocked from asking questions and answering.
-
----
-
-*Maintained with git. Run `git log --oneline` for full history.*
-=======
-# FAQ
->>>>>>> 655d58505ffd99f5232d6f5c4fb351452148d89f
+* **Frontend**: React 18, Vite, React Router v6, Axios, Tailwind CSS + Premium Typography (Playfair Display & Outfit)
+* **Backend**: Express.js, Mongoose, JWT (bcryptjs)
+* **Vector Store**: Qdrant Cloud (HNSW indexes, cosine distance, metadata payload filters)
+* **Embeddings**: Native Node.js `@xenova/transformers` (local WebAssembly ONNX execution of `all-MiniLM-L6-v2`)
+* **Dev Tools**: `concurrently` to run client + server together

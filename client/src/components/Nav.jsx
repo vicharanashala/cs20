@@ -107,7 +107,7 @@ export default function Nav({ refreshUser }) {
     <nav className="bg-white border-b border-border sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14">
         <div className="flex items-center gap-1">
-          <Link to="/dashboard" className="font-bold text-primary mr-4 text-sm">Q&A</Link>
+          <Link to="/dashboard" className="brand-font text-primary mr-5 text-xl tracking-tight hover:opacity-80 transition-opacity">PippaQ</Link>
           {navLinks.map(link => (
             <Link
               key={link.to}

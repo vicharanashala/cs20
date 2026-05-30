@@ -29,7 +29,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-surface flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary">Q&A Platform</h1>
+          <h1 className="brand-font text-4xl text-primary tracking-tight">PippaQ</h1>
           <p className="text-muted mt-2">Sign in to your account</p>
         </div>
         <div className="card p-8">

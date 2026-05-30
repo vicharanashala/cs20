@@ -31,7 +31,6 @@ function mongoIdToUuid(mongoId) {
   const hash = createHash('sha1').update(mongoId.toString()).digest('hex');
   return `${hash.slice(0,8)}-${hash.slice(8,12)}-5${hash.slice(13,16)}-${hash.slice(16,20)}-${hash.slice(20,32)}`;
 }
-
 function buildPayload(faq) {
   return {
     mongoId: faq._id?.toString() || faq.mongoId,
