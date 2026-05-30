@@ -1,6 +1,6 @@
 # CONTEXT.md — PippaQ Project Context
 
-> Last updated: 2026-05-30 | PippaQ branding, Role-Based RTQ Actions, Dashboard Cleanup, and Qdrant/Transformers loops
+> Last updated: 2026-05-30 | PippaQ branding, Standardized Categories, Role-Based RTQ Actions, Dashboard Cleanup, and Qdrant/Transformers loops
 
 ---
 
@@ -130,6 +130,10 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
 * **Ask a Question button:** Restructured [RTQPage.jsx](file:///d:/FAQs/FAQ/client/src/pages/RTQPage.jsx) so the `+ Ask a Question` button is hidden for `'admin'` and `'senior'` roles, remaining visible only for `'student'` and `'moderator'` users.
 * **Dashboard Layouts:** Removed the redundant "Notifications" quick link cards from both [StudentDashboard.jsx](file:///d:/FAQs/FAQ/client/src/pages/StudentDashboard.jsx) and [SeniorDashboard.jsx](file:///d:/FAQs/FAQ/client/src/pages/SeniorDashboard.jsx) (as a dedicated bell indicator exists in the header).
 * **Grid Balancing:** Balanced the dashboards' remaining quick link cards (5 on Student, 3 on Senior) to fill the grid rows perfectly without gaps and updated corresponding skeleton loading layout animations.
+
+### 6. Standardized FAQ/RTQ Categories & Migration Utility
+* **Standardized Categories:** Locked the master list of categories to 10 standardized, clean, non-index-prefixed values across the entire platform in both client utils and shared constants.
+* **Migration Utility:** Created a dedicated database migration tool [migrate-categories.js](file:///d:/FAQs/FAQ/scripts/migrate-categories.js) that cleans up numeric prefixes, maps older categories to correct equivalents, and seeds the `CategoryUpvote` database collection for these 10 clean values.
 
 ---
 
