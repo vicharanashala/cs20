@@ -135,6 +135,7 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
 * **Standardized Categories:** Locked the master list of categories to 10 standardized, clean, non-index-prefixed values across the entire platform in both client utils and shared constants.
 * **Migration Utility:** Created a dedicated database migration tool [migrate-categories.js](file:///d:/FAQs/FAQ/scripts/migrate-categories.js) that cleans up numeric prefixes, maps older categories to correct equivalents, and seeds the `CategoryUpvote` database collection for these 10 clean values.
 * **FAQPage Filter Fix:** Fixed "All Categories" in [FAQPage.jsx](file:///d:/FAQs/FAQ/client/src/pages/FAQPage.jsx) showing only General. Root cause: `filteredCategories` was matching constant-derived names against database-derived `grouped` keys (which still had index prefixes). Fix: use `Object.keys(grouped)` for "All" mode and `FAQ_CATEGORIES` for the dropdown, making the page resilient to any naming format in the database.
+* **Category Upvote Normalization:** Added frontend normalization in `loadFAQs` that strips numeric prefixes (e.g. `"1. About the internship"` → `"About the internship"`) from `grouped` keys on API response. This ensures category names match `FAQ_CATEGORIES` constants so upvote validation, display, and filtering all work correctly — both before and after the database migration runs.
 
 ---
 

@@ -36,7 +36,15 @@ export default function FAQPage() {
         faqService.list({ sort: sortMap[sort], sortDir: sortDir[sort], category: selectedCategory !== 'all' ? selectedCategory : undefined, page: pageNum, limit }),
         faqService.listCategoriesRanked(),
       ]);
-      setGrouped(faqRes.grouped);
+      // Normalize grouped keys: strip numeric prefixes (e.g. "1. About the internship" → "About the internship")
+      const normalizedGrouped = {};
+      for (const [key, value] of Object.entries(faqRes.grouped)) {
+        const normKey = key.replace(/^\d+\.\s*/, '').trim();
+        normalizedGrouped[normKey] = normalizedGrouped[normKey]
+          ? [...normalizedGrouped[normKey], ...value]
+          : value;
+      }
+      setGrouped(normalizedGrouped);
       setCategories(faqRes.categories);
       setRankedCategories(rankedRes);
       if (faqRes.pagination) {
