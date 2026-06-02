@@ -242,12 +242,20 @@ export async function approveAnswer(req, res) {
       return res.status(400).json({ message: 'You have reached the maximum of 2 approvals per question' });
     }
 
-    if (answer.approvals.includes(req.user._id)) {
+    if (answer.approvals.some(id => id.toString() === req.user._id.toString())) {
       return res.status(400).json({ message: 'You have already approved this answer' });
     }
 
-    // Remove from rejections, add to approvals
-    answer.rejections = answer.rejections.filter(id => id.toString() !== req.user._id.toString());
+    // Change of decision: If previously rejected by this moderator, remove their rejection first!
+    if (answer.rejections.some(id => id.toString() === req.user._id.toString())) {
+      answer.rejections = answer.rejections.filter(id => id.toString() !== req.user._id.toString());
+      // Revert the rejection reward for moderator (+3 QP -> deduct 3 QP)
+      await deductQP(req.user._id, 3, 'Reverted answer rejection: changed decision to Approve', answer._id);
+      // Revert the rejection penalty for answerer (-3 QP -> award +3 QP)
+      await awardQP(answer.userId, 3, 'Reverted answer rejection: changed decision to Approve', answer._id);
+    }
+
+    // Add to approvals
     answer.approvals.push(req.user._id);
 
     answer.isApproved = true;
@@ -277,6 +285,20 @@ export async function markAccepted(req, res) {
   try {
     const rtq = await RTQ.findById(req.params.id);
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
+
+    if (rtq.isAccepted) {
+      return res.status(400).json({ message: 'Question is already accepted' });
+    }
+
+    // Change of decision: If previously rejected by this moderator, remove their rejection first!
+    if (rtq.rejectedBy.some(id => id.toString() === req.user._id.toString())) {
+      rtq.rejectedBy = rtq.rejectedBy.filter(id => id.toString() !== req.user._id.toString());
+      // Revert the moderator's rejection reward (+3 QP -> deduct 3 QP)
+      await deductQP(req.user._id, 3, 'Reverted question rejection: changed decision to Accept', rtq._id);
+      if (rtq.rejectedBy.length === 0) {
+        rtq.status = 'unresolved';
+      }
+    }
 
     rtq.isAccepted = true;
     rtq.status = 'resolved';
@@ -442,12 +464,31 @@ export async function rejectAnswer(req, res) {
     const answer = await Answer.findById(req.params.answerId);
     if (!answer) return res.status(404).json({ message: 'Answer not found' });
 
-    if (answer.rejections.includes(req.user._id)) {
+    if (answer.rejections.some(id => id.toString() === req.user._id.toString())) {
       return res.status(400).json({ message: 'You have already rejected this answer' });
     }
 
-    // Remove from approvals, add to rejections
-    answer.approvals = answer.approvals.filter(id => id.toString() !== req.user._id.toString());
+    const rtq = await RTQ.findById(answer.questionId);
+
+    // Change of decision: If previously approved by this moderator, remove their approval first!
+    if (answer.approvals.some(id => id.toString() === req.user._id.toString())) {
+      answer.approvals = answer.approvals.filter(id => id.toString() !== req.user._id.toString());
+      // Revert the approval reward for moderator (+3 QP -> deduct 3 QP)
+      await deductQP(req.user._id, 3, 'Reverted answer approval: changed decision to Reject', answer._id);
+      // Revert the approval reward for answerer (+5 QP -> deduct 5 QP)
+      await deductQP(answer.userId, 5, 'Reverted answer approval: changed decision to Reject', answer._id);
+
+      if (answer.approvals.length === 0) {
+        answer.isApproved = false;
+        answer.approvedBy = null;
+        if (rtq && rtq.approvedAnswer?.toString() === answer._id.toString()) {
+          rtq.approvedAnswer = null;
+          await rtq.save();
+        }
+      }
+    }
+
+    // Add to rejections
     answer.rejections.push(req.user._id);
     await answer.save();
 
@@ -470,8 +511,22 @@ export async function rejectQuestion(req, res) {
     const rtq = await RTQ.findById(req.params.id);
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
-    if (rtq.rejectedBy.includes(req.user._id)) {
+    if (rtq.rejectedBy.some(id => id.toString() === req.user._id.toString())) {
       return res.status(400).json({ message: 'You have already rejected this question' });
+    }
+
+    // Change of decision: If previously accepted, remove the accept first!
+    if (rtq.isAccepted) {
+      rtq.isAccepted = false;
+      const prevAcceptor = rtq.acceptedBy;
+      rtq.acceptedBy = null;
+      
+      // Revert acceptor moderator's reward (+3 QP)
+      if (prevAcceptor) {
+        await deductQP(prevAcceptor, 3, 'Reverted question accept: question rejected later', rtq._id);
+      }
+      // Revert questioner's reward (+5 QP)
+      await deductQP(rtq.postedBy, 5, 'Reverted question accept: question rejected later', rtq._id);
     }
 
     rtq.rejectedBy.push(req.user._id);

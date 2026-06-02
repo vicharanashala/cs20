@@ -1,6 +1,6 @@
 # CONTEXT.md — PippaQ Project Context
 
-> Last updated: 2026-06-02 | Dashboard Role Badges, Whitelist Access Requests, Question Status Marking System, PippaQ branding
+> Last updated: 2026-06-02 | Dashboard Role Badges, Multi-Moderator RTQ Moderation, Decision Transitions, FAQ Settings Menu, PippaQ branding
 
 ---
 
@@ -8,7 +8,7 @@
 
 **PippaQ** is a high-performance, semantic query-resolution and FAQ generation platform featuring a **QP (Quality Point) reputation economy**, **role-based access control**, **Qdrant Cloud vector search**, **local Sentence Transformers**, and **admin-controlled email whitelist signup**. Users raise real-time queries (RTQs), get peer/moderator/senior answers, and high-quality content graduates into an approved FAQ knowledge base.
 
-**Status:** Fully operational. All legacy TF-IDF in-memory vector DBs have been replaced with a production-ready **Sentence Transformer + Qdrant Cloud ANN** pipeline. Complete auto-upvote and QP execution loops are fully integrated. Premium typography and branding (Playfair Display & Outfit) are applied.
+**Status:** Fully operational. All legacy TF-IDF in-memory vector DBs have been replaced with a production-ready **Sentence Transformer + Qdrant Cloud ANN** pipeline. Complete auto-upvote, multi-moderator RTQ loops, decision rollback transactions, and QP execution loops are fully integrated. Premium typography and branding (Playfair Display & Outfit) are applied.
 
 ---
 
@@ -39,13 +39,13 @@ FAQ-main/
 │       │   ├── SignupPage.jsx         # Whitelist Signup + PippaQ community reference
 │       │   ├── LoginPage.jsx          # styled PippaQ brand logo
 │       │   ├── UserListPage.jsx       # Admin: Users + Whitelist + Access Requests tabs
-│       │   ├── FAQPage.jsx             # Category upvote buttons + ranked sorting
+│       │   ├── FAQPage.jsx            # Category upvote buttons + settings gear icon dropdown menu
 │       │   ├── UserProfilePage.jsx    # User profile at /users/:id
 │       │   └── ... (all other pages)
 │       ├── routes/
 │       └── services/
 │           ├── auth.service.js         # requestAccess method
-│           ├── faq.service.js          # listCategoriesRanked, upvoteCategory
+│           ├── faq.service.js          # listCategoriesRanked, upvoteCategory, reviewFAQ, toggleTrendingFAQ
 │           ├── admin.service.js        # Whitelist + Access Request API
 │           └── dashboard.service.js    # Dashboard stats + activity feed
 ├── server/
@@ -59,7 +59,8 @@ FAQ-main/
 │       │   ├── admin.whitelist.controller.js  # Whitelist + access request mgmt
 │       │   ├── auth.controller.js     # signup restriction; requestAccessUser
 │       │   ├── categoryUpvote.controller.js   # list ranked categories + toggle upvote
-│       │   ├── rtq.controller.js      # Submit question + RAG evaluation + QP/Upvote loops
+│       │   ├── rtq.controller.js      # Submit question + RAG evaluation + QP/Upvote loops + multi-moderator
+│       │   ├── faq.controller.js      # FAQ CRUD + Qdrant vectors + review/trending toggles
 │       │   ├── rag.controller.js      # Evaluate + Qdrant-based vector rebuild controllers
 │       │   └── ... (existing)
 │       ├── middleware/
@@ -70,20 +71,23 @@ FAQ-main/
 │       │   ├── RoleRequest.model.js    # Blocked-user re-access requests
 │       │   ├── EmailWhitelist.model.js # admin-controlled signup email list
 │       │   ├── AccessRequest.model.js  # non-whitelisted signup requests
-│       │   └── CategoryUpvote.model.js # category upvotes + upvotedBy tracking
+│       │   ├── CategoryUpvote.model.js # category upvotes + upvotedBy tracking
+│       │   ├── FAQ.model.js           # markedForReview and isTrending flags
+│       │   └── Answer.model.js        # approvals/rejections Arrays + markedForReview flag
 │       ├── routes/
 │       │   ├── admin.routes.js        # Admin-only routes (whitelist + access requests)
 │       │   ├── auth.routes.js         # /request-access endpoint
+│       │   ├── faq.routes.js          # /review-faq and /toggle-trending endpoints
 │       │   ├── categoryUpvote.routes.js # /api/faq/categories/ranked, /upvote/:name
 │       │   └── rag.routes.js          # RAG endpoints: evaluate-question + rebuild-vectors
 │       └── services/
 │           ├── auth.service.js         # signup checks whitelist; JWT: {id, role, qp}
 │           ├── qp.service.js           # awardQP / deductQP service methods
-│           ├── autoupvote.service.js   # NEW: consolidated atomic FAQ & RTQ auto-upvote
+│           ├── autoupvote.service.js   # consolidated atomic FAQ & RTQ auto-upvote
 │           ├── vector/                # Qdrant vector services
 │           │   ├── collection.service.js  # Auto-create collections (HNSW, cosine, 384-dim)
-│           │   ├── embedding.service.js   # Switched to local Sentence Transformer
-│           │   ├── transformer.service.js # NEW: Local @xenova/transformers (all-MiniLM-L6-v2) + LRU Cache
+│           │   ├── embedding.service.js   # Sentence Transformer embeddings
+│           │   ├── transformer.service.js # Local @xenova/transformers (all-MiniLM-L6-v2) + LRU Cache
 │           │   ├── faq.vector.service.js  # FAQ vector CRUD in Qdrant
 │           │   └── rtq.vector.service.js  # RTQ vector CRUD in Qdrant
 │           └── sync/                  # MongoDB ↔ Qdrant sync
@@ -113,7 +117,7 @@ The decision tree inside [decision.tree.js](file:///d:/FAQs/FAQ/rag-engine/decis
 * **F2+R1 (FAQ 50-80%, RTQ > 60%):** REJECT, deduct 5 QP, auto-upvote matching FAQ.
 * **F2+R2 (FAQ 50-80%, RTQ 20-60%):** REJECT, no penalty.
 * **F2+R3 (FAQ 50-80%, RTQ ≤ 20%):** ACCEPT → route to RTQ.
-* **F3+R1 (FAQ ≤ 50%, RTQ > 60%):** REJECT, no penalty, auto-upvote matching RTQ (**Newly wired**).
+* **F3+R1 (FAQ ≤ 50%, RTQ > 60%):** REJECT, no penalty, auto-upvote matching RTQ.
 * **F3+R2/R3 (FAQ ≤ 50%, RTQ ≤ 60%):** ACCEPT → route to RTQ.
 
 ### 3. Consolidated Auto-Upvote Engine
@@ -134,10 +138,10 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
 ### 6. Standardized FAQ/RTQ Categories & Migration Utility
 * **Standardized Categories:** Locked the master list of categories to 10 standardized, clean, non-index-prefixed values across the entire platform in both client utils and shared constants.
 * **Migration Utility:** Created a dedicated database migration tool [migrate-categories.js](file:///d:/FAQs/FAQ/scripts/migrate-categories.js) that cleans up numeric prefixes, maps older categories to correct equivalents, and seeds the `CategoryUpvote` database collection for these 10 clean values.
-* **FAQPage Filter Fix:** Fixed "All Categories" in [FAQPage.jsx](file:///d:/FAQs/FAQ/client/src/pages/FAQPage.jsx) showing only General. Root cause: `filteredCategories` was matching constant-derived names against database-derived `grouped` keys (which still had index prefixes). Fix: use `Object.keys(grouped)` for "All" mode and `FAQ_CATEGORIES` for the dropdown, making the page resilient to any naming format in the database.
-* **Category Upvote Normalization & Dash Cleaning:** Added frontend normalization in `loadFAQs` that strips numeric prefixes (e.g. `"9. Rosetta — your internship journal"` → `"Rosetta - your internship journal"`) from `grouped` keys on API response and converts Unicode em-dashes (`—` or `–`) into standard regular hyphens (`-`) with standardized spacing. This ensures all category names completely match `FAQ_CATEGORIES` constants so upvote validation, display, and filtering all work correctly.
+* **FAQPage Filter Fix:** Fixed "All Categories" in [FAQPage.jsx](file:///d:/FAQs/FAQ/client/src/pages/FAQPage.jsx) showing only General.
+* **Category Upvote Normalization & Dash Cleaning:** Added frontend normalization in `loadFAQs` that strips numeric prefixes (e.g. `"9. Rosetta — your internship journal"` → `"Rosetta - your internship journal"`) from `grouped` keys on API response and converts Unicode em-dashes (`—` or `–`) into standard regular hyphens (`-`) with standardized spacing.
 * **Retractable/Toggleable Upvotes:** Fixed a UI constraint in [UpvoteButton.jsx](file:///d:/FAQs/FAQ/client/src/components/UpvoteButton.jsx) that was disabling the button when `hasUpvoted` was true. Toggling off upvotes is now fully enabled, allowing users to retract their upvote by clicking the active button again.
-* **Flexible Backend Category Matcher:** Modified the category filters in [faq.controller.js](file:///d:/FAQs/FAQ/server/src/controllers/faq.controller.js) and [rtq.controller.js](file:///d:/FAQs/FAQ/server/src/controllers/rtq.controller.js) to query categories using a robust regex pattern. This regex accounts for optional index prefixes and any em-dash/en-dash variations in the database (e.g., matches both `"Rosetta - your internship journal"` and `"9. Rosetta — your internship journal"`). This makes category filtering on both FAQ and RTQ pages 100% operational before and after running database migrations.
+* **Flexible Backend Category Matcher:** Modified the category filters in [faq.controller.js](file:///d:/FAQs/FAQ/server/src/controllers/faq.controller.js) and [rtq.controller.js](file:///d:/FAQs/FAQ/server/src/controllers/rtq.controller.js) to query categories using a robust regex pattern.
 * **Default Category & Item Sorting:** Updated `filteredCategories` on the FAQPage to sort rendered categories according to their upvote counts (`sortedCategoryNames`) by default, placing the category with the most upvotes at the top. Also added a `sortItems` utility that sorts the FAQs inside each category on the frontend according to the active sort filter selection ('Most Upvoted', 'Newest First', 'Oldest First') to guarantee perfect sorting alignment under all conditions.
 
 ### 7. Question Status Marking System
@@ -164,6 +168,30 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
   - `'senior'`: Blue badge (`Senior`)
   - `'admin'`: Red badge (`Admin` / `Admin Dashboard` header)
 * **Compatibility:** Completely non-disruptive, preserves all existing stats, rank queries, and grid balancing actions.
+
+### 10. Multi-Moderator RTQ Moderation & QP Economy
+* **Multi-Moderator Answer Approvals**:
+  - Allows multiple moderator approvals per answer (capped at max 2 approvals per question per moderator to prevent collusion).
+  - Approvals reward the answerer `+5 QP` and the moderator `+3 QP`.
+* **Answer Rejections**:
+  - Allows moderator rejections. Rejections penalize the answerer `-3 QP` and reward the moderator `+3 QP`.
+* **Question Acceptance**:
+  - Accepting an RTQ question changes status to `'resolved'`, sets `isAccepted = true`, and rewards `+5 QP` to the questioner and `+3 QP` to the moderator.
+* **Question Rejection (Multi-Moderator)**:
+  - First moderator rejection sets status to `'rejected'` and rewards `+3 QP` to the moderator.
+  - A second moderator rejection by a different moderator triggers permanent deletion of the question from MongoDB and Qdrant, deducts `5 QP` from the questioner, and rewards `+3 QP` to the second moderator.
+* **Decision Transitions & QP Rollbacks**:
+  - Implemented automatic, idempotent decision rollback and QP adjustment logic when a moderator changes their decision (e.g. from Accept to Reject, or Approve to Reject):
+    - Retracts the previous mark and calculates the precise QP points to deduct or refund from both the user and the moderator before applying the new decision.
+* **Sleek Icon-Only Frontend Controls**:
+  - Refactored `RTQPage.jsx` and `RTQDetailPage.jsx` selection controls and action panels to use sleek Lucide icons instead of text:
+    - Selection/cancel actions are represented by a clean settings gear (`Settings`) icon.
+    - Action buttons render as compact, modern check (`Check`), close (`X`), and flag (`Flag`) icons with supportive tooltips.
+* **Universal Badge Visibility**:
+  - Status marks (`✓ Moderator Accepted`, `✗ Moderator Rejected`, `⚠️ Marked for Review`, `✓ Moderator Approved`, `✗ Moderator Rejected`) are rendered universally, making them visible to all users (including students) across the RTQ list, RTQ detail, track questions, and working history views.
+* **FAQ Page Moderator Actions (Settings Dropdown Menu)**:
+  - Refactored `FAQPage.jsx` to render a small Lucide `Settings` gear icon button for moderator actions on any FAQ card, hidden completely from student users.
+  - Clicking this gear opens a premium popover dropdown menu containing `Flag for Review` (if not reviewed yet), `Set on Trending` / `Remove Trending` (which toggles trending status via `PATCH /faq/toggle-trending/:id`), and senior's `Edit FAQ` and `Delete FAQ` actions.
 
 ---
 

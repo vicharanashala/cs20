@@ -151,6 +151,42 @@ export async function upvoteFAQ(req, res) {
   }
 }
 
+export async function markFAQForReview(req, res) {
+  try {
+    const faq = await FAQ.findById(req.params.id);
+    if (!faq) return res.status(404).json({ message: 'FAQ not found' });
+    faq.markedForReview = true;
+    await faq.save();
+    try {
+      await syncFAQUpdate(req.params.id, faq);
+    } catch (err) {
+      logger.error(`[FAQ-Controller] Qdrant update sync failed for reviewed FAQ ${faq._id}: ${err.message}`);
+    }
+    res.json(faq);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+export async function toggleTrendingFAQ(req, res) {
+  try {
+    const faq = await FAQ.findById(req.params.id);
+    if (!faq) return res.status(404).json({ message: 'FAQ not found' });
+    faq.isTrending = !faq.isTrending;
+    await faq.save();
+    try {
+      await syncFAQUpdate(req.params.id, faq);
+    } catch (err) {
+      logger.error(`[FAQ-Controller] Qdrant update sync failed for trending FAQ ${faq._id}: ${err.message}`);
+    }
+    res.json(faq);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
 export async function getCategories(req, res) {
   res.json(FAQ_CATEGORIES);
 }
