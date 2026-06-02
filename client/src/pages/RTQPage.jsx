@@ -8,7 +8,7 @@ import { SkeletonCard } from '../components/SkeletonLoader';
 import { Spinner } from '../components/SkeletonLoader';
 import BackToTop from '../components/BackToTop';
 import { FAQ_CATEGORIES } from '../utils/constants';
-import { Settings, Check, X, Flag } from 'lucide-react';
+import { Settings, Check, X, Flag, Trash2, BookOpen } from 'lucide-react';
 
 const LIMIT = 20;
 
@@ -140,6 +140,27 @@ export default function RTQPage() {
     }
   };
 
+  const handleRemoveQuestion = async (rtqId) => {
+    if (!confirm('Are you sure you want to permanently delete/remove this question? This will penalize the author -5 QP.')) return;
+    try {
+      await rtqService.remove(rtqId);
+      loadRTQs(page);
+      refreshQP?.();
+    } catch (err) {
+      alert(err.message || 'Failed to remove question');
+    }
+  };
+
+  const handleConvertToFAQ = async (rtqId) => {
+    try {
+      await rtqService.convertToFAQ(rtqId);
+      loadRTQs(page);
+      refreshQP?.();
+    } catch (err) {
+      alert(err.message || 'Failed to convert RTQ to FAQ');
+    }
+  };
+
   const handleApproveAnswer = async (answerId) => {
     try {
       await rtqService.approveAnswer(answerId);
@@ -176,7 +197,7 @@ export default function RTQPage() {
           <h1 className="text-2xl font-bold text-primary">Raise to Clarify (RTQ)</h1>
           <p className="text-muted text-sm mt-1">Questions pending clarification</p>
         </div>
-        {user && ['student', 'moderator'].includes(user.role) && (
+        {user && ['student', 'moderator', 'senior'].includes(user.role) && (
           <Link to="/raise-question" className="btn-primary">+ Ask a Question</Link>
         )}
       </div>
@@ -194,6 +215,8 @@ export default function RTQPage() {
           <option value="unresolved">Unresolved</option>
           <option value="resolved">Resolved</option>
           <option value="partial">Has Answers</option>
+          <option value="accepted">Accepted</option>
+          <option value="rejected">Rejected</option>
         </select>
         <select value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setPage(1); }} className="input w-auto">
           <option value="">All Categories</option>
@@ -284,6 +307,24 @@ export default function RTQPage() {
                               <Flag className="w-4 h-4" />
                             </button>
                           )}
+                          {isSeniorOrAdmin && (
+                            <>
+                              <button
+                                onClick={() => handleConvertToFAQ(rtq._id)}
+                                className="p-1.5 border border-blue-200 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                                title="Convert to FAQ"
+                              >
+                                <BookOpen className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveQuestion(rtq._id)}
+                                className="p-1.5 border border-red-200 text-red-500 rounded hover:bg-red-50 transition-colors"
+                                title="Remove Question Permanently"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
 
@@ -320,7 +361,18 @@ export default function RTQPage() {
                                 >
                                   ↑ {ans.upvotes}
                                 </button>
-                                <span className="text-xs text-muted">{ans.userId?.name || 'Unknown'}</span>
+                                <span className="text-xs text-muted">
+                                  {ans.userId?.name || 'Unknown'}
+                                  {ans.userId?.role && (
+                                    <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded font-semibold ${
+                                      ans.userId.role === 'senior' ? 'bg-blue-100 text-blue-700' :
+                                      ans.userId.role === 'moderator' ? 'bg-purple-100 text-purple-700' :
+                                      'bg-slate-100 text-slate-600'
+                                    }`}>
+                                      {ans.userId.role}
+                                    </span>
+                                  )}
+                                </span>
                                 
                                 {(ans.approvals?.length > 0 || ans.isApproved) && (
                                   <span className="text-xs px-2 py-0.5 bg-green-50 border border-green-200 text-green-700 rounded font-semibold">

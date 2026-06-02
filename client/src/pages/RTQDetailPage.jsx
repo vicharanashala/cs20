@@ -6,7 +6,7 @@ import { useQP } from '../context/QPContext';
 import { timeAgo } from '../utils/helpers';
 import UpvoteButton from '../components/UpvoteButton';
 import { Spinner } from '../components/SkeletonLoader';
-import { Settings, Check, X, Flag } from 'lucide-react';
+import { Settings, Check, X, Flag, Trash2, BookOpen } from 'lucide-react';
 
 export default function RTQDetailPage() {
   const { id } = useParams();
@@ -128,6 +128,26 @@ export default function RTQDetailPage() {
       load();
     } catch (err) {
       alert(err.message || 'Failed to mark question for review');
+    }
+  };
+
+  const handleRemoveQuestion = async () => {
+    if (!confirm('Are you sure you want to permanently delete/remove this question? This will penalize the author -5 QP.')) return;
+    try {
+      await rtqService.remove(id);
+      navigate('/rtq');
+    } catch (err) {
+      alert(err.message || 'Failed to remove question');
+    }
+  };
+
+  const handleConvertToFAQ = async () => {
+    try {
+      await rtqService.convertToFAQ(id);
+      load();
+      refreshQP?.();
+    } catch (err) {
+      alert(err.message || 'Failed to convert RTQ to FAQ');
     }
   };
 
@@ -284,6 +304,24 @@ export default function RTQDetailPage() {
                   >
                     <Flag className="w-4 h-4" />
                   </button>
+                )}
+                {isSeniorOrAdmin && (
+                  <>
+                    <button
+                      onClick={handleConvertToFAQ}
+                      className="p-1.5 border border-blue-200 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                      title="Convert to FAQ"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={handleRemoveQuestion}
+                      className="p-1.5 border border-red-200 text-red-500 rounded hover:bg-red-50 transition-colors"
+                      title="Remove Question Permanently"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
                 )}
               </div>
             )}

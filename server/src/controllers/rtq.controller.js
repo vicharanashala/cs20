@@ -33,6 +33,10 @@ export async function listRTQs(req, res) {
       allRtqs = allRtqs.filter(r => r.status === 'resolved' || r.isAccepted);
     } else if (filter === 'partial') {
       allRtqs = allRtqs.filter(r => r.status === 'partially_resolved' || (r.answers?.length > 0 && !r.isAccepted));
+    } else if (filter === 'accepted') {
+      allRtqs = allRtqs.filter(r => r.isAccepted);
+    } else if (filter === 'rejected') {
+      allRtqs = allRtqs.filter(r => r.status === 'rejected');
     }
 
     if (category) {
@@ -253,8 +257,9 @@ export async function approveAnswer(req, res) {
     // Change of decision: If previously rejected by this moderator, remove their rejection first!
     if (answer.rejections.some(id => id.toString() === req.user._id.toString())) {
       answer.rejections = answer.rejections.filter(id => id.toString() !== req.user._id.toString());
-      // Revert the rejection reward for moderator (+3 QP -> deduct 3 QP)
-      await deductQP(req.user._id, 3, 'Reverted answer rejection: changed decision to Approve', answer._id);
+      // Revert the rejection reward for moderator (+3 QP or +5 QP for senior -> deduct accordingly)
+      const prevRejectionReward = req.user.role === 'senior' || req.user.role === 'admin' ? 5 : 3;
+      await deductQP(req.user._id, prevRejectionReward, 'Reverted answer rejection: changed decision to Approve', answer._id);
       // Revert the rejection penalty for answerer (-3 QP -> award +3 QP)
       await awardQP(answer.userId, 3, 'Reverted answer rejection: changed decision to Approve', answer._id);
     }
@@ -335,8 +340,12 @@ export async function removeRTQ(req, res) {
     const rtq = await RTQ.findById(req.params.id);
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
+    // Deduct -5 QP from questioner
     await deductQP(rtq.postedBy, Math.abs(QP_RULES.PENALTY_QUESTION_REMOVED),
       'Question removed by senior', rtq._id);
+    // Award +5 QP to senior/admin
+    await awardQP(req.user._id, 5, 'Senior removed a question', rtq._id);
+
     await notifyUser(rtq.postedBy, 'student', 'question_removed',
       `Your question was removed. ${QP_RULES.PENALTY_QUESTION_REMOVED} QP`, QP_RULES.PENALTY_QUESTION_REMOVED, rtq._id);
 
@@ -372,39 +381,46 @@ export async function convertToFAQ(req, res) {
   try {
     const rtq = await RTQ.findById(req.params.id).populate({
       path: 'answers',
-      populate: { path: 'userId', select: '_id name role' }
+      populate: [
+        { path: 'userId', select: '_id name role' },
+        { path: 'approvals', select: '_id role' }
+      ]
     });
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
     const answers = [...(rtq.answers || [])].sort((a, b) => b.upvotes - a.upvotes);
 
-    let selectedAnswer = null;
     let selectedAnswerDoc = null;
 
-    for (const ans of answers) {
-      if (ans.userId?._id?.toString() === req.user._id.toString()) {
-        selectedAnswer = ans.answer;
-        selectedAnswerDoc = ans;
-        break;
-      }
+    // Priority 1: Senior's own answer (written by the converting Senior/Admin)
+    selectedAnswerDoc = answers.find(ans => 
+      (ans.userId?._id || ans.userId)?.toString() === req.user._id.toString()
+    );
+
+    // Priority 2: Senior-approved answer (approved by any senior or admin)
+    if (!selectedAnswerDoc) {
+      selectedAnswerDoc = answers.find(ans => 
+        ans.approvals?.some(u => u.role === 'senior' || u.role === 'admin')
+      );
     }
-    if (!selectedAnswer) {
-      for (const ans of answers) {
-        if (ans.approvedBy?.toString() === req.user._id.toString()) {
-          selectedAnswer = ans.answer;
-          selectedAnswerDoc = ans;
-          break;
-        }
-      }
+
+    // Priority 3: Moderator-approved answer (approved by any moderator)
+    if (!selectedAnswerDoc) {
+      selectedAnswerDoc = answers.find(ans => 
+        ans.approvals?.some(u => u.role === 'moderator')
+      );
     }
-    if (!selectedAnswer && answers.length > 0) {
-      selectedAnswer = answers[0].answer;
+
+    // Priority 4: Otherwise → most upvoted answer
+    if (!selectedAnswerDoc && answers.length > 0) {
       selectedAnswerDoc = answers[0];
     }
 
-    if (!selectedAnswer) {
+    if (!selectedAnswerDoc) {
       return res.status(400).json({ message: 'No answer available to convert' });
     }
+
+    const selectedAnswer = selectedAnswerDoc.answer;
 
     const faq = await FAQ.create({
       question: rtq.question,
@@ -417,8 +433,9 @@ export async function convertToFAQ(req, res) {
     if (selectedAnswerDoc) {
       selectedAnswerDoc.isSelectedForFAQ = true;
       await selectedAnswerDoc.save();
-      await awardQP(selectedAnswerDoc.userId._id, QP_RULES.ANSWER_SELECTED_FOR_FAQ, 'Answer selected for FAQ', selectedAnswerDoc._id);
-      await notifyUser(selectedAnswerDoc.userId._id, 'student', 'answer_selected_for_faq',
+      const answererId = selectedAnswerDoc.userId?._id || selectedAnswerDoc.userId;
+      await awardQP(answererId, QP_RULES.ANSWER_SELECTED_FOR_FAQ, 'Answer selected for FAQ', selectedAnswerDoc._id);
+      await notifyUser(answererId, 'student', 'answer_selected_for_faq',
         `Your answer was selected for FAQ. +${QP_RULES.ANSWER_SELECTED_FOR_FAQ} QP`, QP_RULES.ANSWER_SELECTED_FOR_FAQ, selectedAnswerDoc._id);
     }
 
@@ -484,8 +501,9 @@ export async function rejectAnswer(req, res) {
     // Change of decision: If previously approved by this moderator, remove their approval first!
     if (answer.approvals.some(id => id.toString() === req.user._id.toString())) {
       answer.approvals = answer.approvals.filter(id => id.toString() !== req.user._id.toString());
-      // Revert the approval reward for moderator (+3 QP -> deduct 3 QP)
-      await deductQP(req.user._id, 3, 'Reverted answer approval: changed decision to Reject', answer._id);
+      // Revert the approval reward for moderator/senior (+3 QP or +5 QP for senior -> deduct accordingly)
+      const prevApprovalReward = req.user.role === 'senior' || req.user.role === 'admin' ? 5 : 3;
+      await deductQP(req.user._id, prevApprovalReward, 'Reverted answer approval: changed decision to Reject', answer._id);
       // Revert the approval reward for answerer (+5 QP -> deduct 5 QP)
       await deductQP(answer.userId, 5, 'Reverted answer approval: changed decision to Reject', answer._id);
 
@@ -503,9 +521,10 @@ export async function rejectAnswer(req, res) {
     answer.rejections.push(req.user._id);
     await answer.save();
 
-    // -3 QP to answerer, +3 QP to moderator
+    // -3 QP to answerer, dynamic QP to moderator/senior (+3 QP for moderator, +5 QP for senior)
+    const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? 5 : 3;
     await deductQP(answer.userId, 3, 'Answer rejected by moderator', answer._id);
-    await awardQP(req.user._id, 3, 'Moderator rejected an answer', answer._id);
+    await awardQP(req.user._id, qpAmount, `${req.user.role} rejected an answer`, answer._id);
 
     await notifyUser(answer.userId, 'student', 'answer_rejected',
       `Your answer was marked as rejected by a moderator. -3 QP`, -3, answer._id);
