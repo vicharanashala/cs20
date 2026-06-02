@@ -11,6 +11,7 @@ const rtqService = {
   remove: (id) => api.delete(`/rtq/${id}`),
   report: (id) => api.post(`/rtq/report/${id}`),
   convertToFAQ: (id) => api.post(`/rtq/convert/${id}`),
+  updateStatus: (id, status) => api.patch(`/rtq/status/${id}`, { status }),
 };
 
 export default rtqService;

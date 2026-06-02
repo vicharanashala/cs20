@@ -1,6 +1,6 @@
 # CONTEXT.md — PippaQ Project Context
 
-> Last updated: 2026-05-30 | PippaQ branding, Standardized Categories, Role-Based RTQ Actions, Dashboard Cleanup, and Qdrant/Transformers loops
+> Last updated: 2026-06-02 | Whitelist Access Requests, Question Status Marking System, PippaQ branding, Standardized Categories
 
 ---
 
@@ -139,6 +139,22 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
 * **Retractable/Toggleable Upvotes:** Fixed a UI constraint in [UpvoteButton.jsx](file:///d:/FAQs/FAQ/client/src/components/UpvoteButton.jsx) that was disabling the button when `hasUpvoted` was true. Toggling off upvotes is now fully enabled, allowing users to retract their upvote by clicking the active button again.
 * **Flexible Backend Category Matcher:** Modified the category filters in [faq.controller.js](file:///d:/FAQs/FAQ/server/src/controllers/faq.controller.js) and [rtq.controller.js](file:///d:/FAQs/FAQ/server/src/controllers/rtq.controller.js) to query categories using a robust regex pattern. This regex accounts for optional index prefixes and any em-dash/en-dash variations in the database (e.g., matches both `"Rosetta - your internship journal"` and `"9. Rosetta — your internship journal"`). This makes category filtering on both FAQ and RTQ pages 100% operational before and after running database migrations.
 * **Default Category & Item Sorting:** Updated `filteredCategories` on the FAQPage to sort rendered categories according to their upvote counts (`sortedCategoryNames`) by default, placing the category with the most upvotes at the top. Also added a `sortItems` utility that sorts the FAQs inside each category on the frontend according to the active sort filter selection ('Most Upvoted', 'Newest First', 'Oldest First') to guarantee perfect sorting alignment under all conditions.
+
+### 7. Question Status Marking System
+* **Models:** Updated `RTQ.model.js` and `Question.model.js` status enums to `['unresolved', 'partially_resolved', 'resolved']`, with default status as `'unresolved'`.
+* **API Endpoints:** Added route `PATCH /rtq/status/:questionId` mapping to the secure `updateRTQStatus` controller (accessible only by the question owner).
+* **Auto-Update Hooks:** Integrated a senior answering auto-resolve hook inside `addAnswer` so that when a Senior submits an answer to an RTQ, the question status automatically changes to `'resolved'`.
+* **Frontend Division of Concerns:**
+  - **Public RTQ Listing & Details Pages**: Display status as premium read-only badges (`Unresolved`, `Partially Resolved`, `Resolved`) using custom visual highlights (Red, Amber, Green).
+  - **Track Questions Page**: Renders interactive status dropdown selectors for the owner's RTQ submissions, allowing manual resolution tracking directly from their tracking dashboard.
+
+### 8. Whitelist Request Access System
+* **Context & Rules:** Users attempting signup with emails not in the admin whitelist are restricted (`403 Forbidden`).
+* **Request Access Flow:**
+  - Signup page displays a distinct **"Access Restricted"** message and a **"Request Approval"** button.
+  - Submitting a request creates an `AccessRequest` document in the database (`pending` status).
+  - Admin view (`UserListPage.jsx` > `Access Requests` tab) can **Approve** (adds email to whitelist, creates active `'student'` user) or **Reject** (marks request as rejected).
+* **Fix & Alignment:** Aligned [SignupPage.jsx](file:///d:/FAQs/FAQ/client/src/pages/SignupPage.jsx) error handlers to resolve a mapping mismatch with the custom Axios response interceptor (`api.js`), which rejects promises directly with the payload data object, restoring full visibility of the "Request Approval" flow.
 
 ---
 

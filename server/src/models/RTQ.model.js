@@ -5,7 +5,7 @@ const rtqSchema = new mongoose.Schema({
   category: { type: String, required: true },
   tags: [{ type: String }],
   answers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Answer' }],
-  status: { type: String, enum: ['open', 'resolved'], default: 'open' },
+  status: { type: String, enum: ['unresolved', 'partially_resolved', 'resolved'], default: 'unresolved' },
   upvotes: { type: Number, default: 0 },
   upvotedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
