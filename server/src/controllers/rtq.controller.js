@@ -172,6 +172,8 @@ export async function addAnswer(req, res) {
       return res.status(400).json({ message: 'You have already answered this question' });
     }
 
+    const wasAlreadyResolved = rtq.status === 'resolved';
+
     const newAnswer = await Answer.create({
       questionId: rtq._id,
       userId: req.user._id,
@@ -179,15 +181,17 @@ export async function addAnswer(req, res) {
     });
 
     rtq.answers.push(newAnswer._id);
-    if (req.user.role === 'senior') {
+    if (!wasAlreadyResolved && (req.user.role === 'senior' || req.user.role === 'admin')) {
       rtq.status = 'resolved';
     }
     await rtq.save();
 
-    const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_ANSWER : QP_RULES.ANSWER_QUESTION;
-    await awardQP(req.user._id, qpAmount, 'Answered a question', newAnswer._id);
-    await notifyUser(req.user._id, req.user.role, 'answer_added',
-      `You answered a question. +${qpAmount} QP`, qpAmount, newAnswer._id);
+    if (!wasAlreadyResolved) {
+      const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? QP_RULES.SENIOR_ANSWER : QP_RULES.ANSWER_QUESTION;
+      await awardQP(req.user._id, qpAmount, 'Answered a question', newAnswer._id);
+      await notifyUser(req.user._id, req.user.role, 'answer_added',
+        `You answered a question. +${qpAmount} QP`, qpAmount, newAnswer._id);
+    }
 
     if (rtq.postedBy.toString() !== req.user._id.toString()) {
       await notifyUser(rtq.postedBy, 'student', 'new_answer',
@@ -267,12 +271,14 @@ export async function approveAnswer(req, res) {
       await rtq.save();
     }
 
-    // Award +5 QP to answerer, +3 QP to moderator
-    await awardQP(answer.userId, 5, 'Answer approved by moderator', answer._id);
-    await awardQP(req.user._id, 3, 'Moderator approved an answer', answer._id);
+    if (rtq.status !== 'resolved') {
+      const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? QP_RULES.SENIOR_APPROVE_ANSWER : 3;
+      await awardQP(req.user._id, qpAmount, `${req.user.role} approved an answer`, answer._id);
+      await awardQP(answer.userId, 5, 'Answer approved by moderator', answer._id);
 
-    await notifyUser(answer.userId, 'student', 'answer_approved',
-      `Your answer was approved. +5 QP`, 5, answer._id);
+      await notifyUser(answer.userId, 'student', 'answer_approved',
+        `Your answer was approved. +5 QP`, 5, answer._id);
+    }
 
     res.json({ message: 'Answer approved', answer });
   } catch (err) {
@@ -290,6 +296,8 @@ export async function markAccepted(req, res) {
       return res.status(400).json({ message: 'Question is already accepted' });
     }
 
+    const wasAlreadyResolved = rtq.status === 'resolved';
+
     // Change of decision: If previously rejected by this moderator, remove their rejection first!
     if (rtq.rejectedBy.some(id => id.toString() === req.user._id.toString())) {
       rtq.rejectedBy = rtq.rejectedBy.filter(id => id.toString() !== req.user._id.toString());
@@ -305,12 +313,15 @@ export async function markAccepted(req, res) {
     rtq.acceptedBy = req.user._id;
     await rtq.save();
 
-    // Award +5 QP to questioner, +3 QP to moderator
-    await awardQP(rtq.postedBy, 5, 'Question accepted by moderator', rtq._id);
-    await awardQP(req.user._id, 3, 'Moderator accepted a question', rtq._id);
+    if (!wasAlreadyResolved) {
+      // Award +5 QP to questioner, +3 QP to moderator (or SENIOR_APPROVE_ANSWER if senior/admin)
+      const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? QP_RULES.SENIOR_APPROVE_ANSWER : 3;
+      await awardQP(rtq.postedBy, 5, 'Question accepted by moderator', rtq._id);
+      await awardQP(req.user._id, qpAmount, `${req.user.role} accepted question`, rtq._id);
 
-    await notifyUser(rtq.postedBy, 'student', 'question_accepted',
-      `Your question was accepted by a moderator. +5 QP`, 5, rtq._id);
+      await notifyUser(rtq.postedBy, 'student', 'question_accepted',
+        `Your question was accepted by a moderator. +5 QP`, 5, rtq._id);
+    }
 
     res.json({ message: 'Question accepted', rtq });
   } catch (err) {
