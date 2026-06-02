@@ -2,7 +2,8 @@ import { Router } from 'express';
 import {
   listRTQs, getRTQ, submitQuestion, addAnswer, upvoteAnswer,
   approveAnswer, markAccepted, removeRTQ, reportRTQ, convertToFAQ,
-  updateRTQStatus
+  updateRTQStatus, rejectAnswer, rejectQuestion, markRTQForReview,
+  markAnswerForReview
 } from '../controllers/rtq.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { authorizeRoles } from '../middleware/role.middleware.js';
@@ -19,6 +20,10 @@ router.patch('/mark-accepted/:id', authenticate, authorizeRoles('moderator', 'se
 router.post('/convert/:id', authenticate, authorizeRoles('senior', 'admin'), convertToFAQ);
 router.post('/report/:id', authenticate, reportRTQ);
 router.patch('/status/:questionId', authenticate, updateRTQStatus);
+router.patch('/reject-answer/:answerId', authenticate, authorizeRoles('moderator', 'senior', 'admin'), rejectAnswer);
+router.patch('/reject-question/:id', authenticate, authorizeRoles('moderator', 'senior', 'admin'), rejectQuestion);
+router.patch('/review-question/:id', authenticate, authorizeRoles('moderator', 'senior', 'admin'), markRTQForReview);
+router.patch('/review-answer/:answerId', authenticate, authorizeRoles('moderator', 'senior', 'admin'), markAnswerForReview);
 
 // Dynamic /:id routes last
 router.get('/:id', authenticate, getRTQ);

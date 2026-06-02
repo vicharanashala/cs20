@@ -96,8 +96,18 @@ export default function TrackQuestionPage() {
                           </select>
                         </div>
                         {rtq.isAccepted && (
-                          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                            ✓ Accepted
+                          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">
+                            ✓ Moderator Accepted
+                          </span>
+                        )}
+                        {rtq.status === 'rejected' && (
+                          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-semibold">
+                            ✗ Moderator Rejected
+                          </span>
+                        )}
+                        {rtq.markedForReview && (
+                          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-semibold">
+                            ⚠️ Marked for Review
                           </span>
                         )}
                       </div>

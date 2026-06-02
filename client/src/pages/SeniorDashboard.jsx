@@ -97,7 +97,14 @@ export default function SeniorDashboard() {
       <>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-primary">Senior Dashboard</h1>
+          <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
+            {user?.role === 'admin' ? 'Admin Dashboard' : 'Senior Dashboard'}
+            <span className={`text-xs px-2.5 py-0.5 rounded-full border font-semibold tracking-wide uppercase ${
+              user?.role === 'admin' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'
+            }`}>
+              {user?.role === 'admin' ? 'Admin' : 'Senior'}
+            </span>
+          </h1>
           <p className="text-muted mt-1">Manage content and approve user activities</p>
         </div>
         <div className="text-right">

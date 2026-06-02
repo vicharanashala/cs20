@@ -237,6 +237,31 @@ export async function approveAnswer(req, res) {
     const rtq = await RTQ.findById(answer.questionId);
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
+    // check max 2 approvals per question per moderator
+    const userApprovalsCount = await Answer.countDocuments({
+      questionId: answer.questionId,
+      approvals: req.user._id
+    });
+    if (userApprovalsCount >= 2 && !answer.approvals.includes(req.user._id)) {
+      return res.status(400).json({ message: 'You have reached the maximum of 2 approvals per question' });
+    }
+
+    if (answer.approvals.some(id => id.toString() === req.user._id.toString())) {
+      return res.status(400).json({ message: 'You have already approved this answer' });
+    }
+
+    // Change of decision: If previously rejected by this moderator, remove their rejection first!
+    if (answer.rejections.some(id => id.toString() === req.user._id.toString())) {
+      answer.rejections = answer.rejections.filter(id => id.toString() !== req.user._id.toString());
+      // Revert the rejection reward for moderator (+3 QP -> deduct 3 QP)
+      await deductQP(req.user._id, 3, 'Reverted answer rejection: changed decision to Approve', answer._id);
+      // Revert the rejection penalty for answerer (-3 QP -> award +3 QP)
+      await awardQP(answer.userId, 3, 'Reverted answer rejection: changed decision to Approve', answer._id);
+    }
+
+    // Add to approvals
+    answer.approvals.push(req.user._id);
+
     answer.isApproved = true;
     answer.approvedBy = req.user._id;
     await answer.save();
@@ -247,12 +272,12 @@ export async function approveAnswer(req, res) {
     }
 
     if (rtq.status !== 'resolved') {
-      const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_APPROVE_ANSWER;
+      const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? QP_RULES.SENIOR_APPROVE_ANSWER : 3;
       await awardQP(req.user._id, qpAmount, `${req.user.role} approved an answer`, answer._id);
-      await awardQP(answer.userId, QP_RULES.ANSWER_APPROVED, 'Answer approved', answer._id);
+      await awardQP(answer.userId, 5, 'Answer approved by moderator', answer._id);
 
       await notifyUser(answer.userId, 'student', 'answer_approved',
-        `Your answer was approved. +${QP_RULES.ANSWER_APPROVED} QP`, QP_RULES.ANSWER_APPROVED, answer._id);
+        `Your answer was approved. +5 QP`, 5, answer._id);
     }
 
     res.json({ message: 'Answer approved', answer });
@@ -267,7 +292,21 @@ export async function markAccepted(req, res) {
     const rtq = await RTQ.findById(req.params.id);
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
+    if (rtq.isAccepted) {
+      return res.status(400).json({ message: 'Question is already accepted' });
+    }
+
     const wasAlreadyResolved = rtq.status === 'resolved';
+
+    // Change of decision: If previously rejected by this moderator, remove their rejection first!
+    if (rtq.rejectedBy.some(id => id.toString() === req.user._id.toString())) {
+      rtq.rejectedBy = rtq.rejectedBy.filter(id => id.toString() !== req.user._id.toString());
+      // Revert the moderator's rejection reward (+3 QP -> deduct 3 QP)
+      await deductQP(req.user._id, 3, 'Reverted question rejection: changed decision to Accept', rtq._id);
+      if (rtq.rejectedBy.length === 0) {
+        rtq.status = 'unresolved';
+      }
+    }
 
     rtq.isAccepted = true;
     rtq.status = 'resolved';
@@ -275,12 +314,14 @@ export async function markAccepted(req, res) {
     await rtq.save();
 
     if (!wasAlreadyResolved) {
-      const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_MARK_ACCEPTED;
+      // Award +5 QP to questioner, +3 QP to moderator (or SENIOR_APPROVE_ANSWER if senior/admin)
+      const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? QP_RULES.SENIOR_APPROVE_ANSWER : 3;
+      await awardQP(rtq.postedBy, 5, 'Question accepted by moderator', rtq._id);
       await awardQP(req.user._id, qpAmount, `${req.user.role} accepted question`, rtq._id);
-    }
 
-    await notifyUser(rtq.postedBy, 'student', 'question_accepted',
-      `Your question was accepted by a ${req.user.role}.`, 0, rtq._id);
+      await notifyUser(rtq.postedBy, 'student', 'question_accepted',
+        `Your question was accepted by a moderator. +5 QP`, 5, rtq._id);
+    }
 
     res.json({ message: 'Question accepted', rtq });
   } catch (err) {
@@ -423,6 +464,135 @@ export async function updateRTQStatus(req, res) {
     await rtq.save();
 
     res.json({ message: 'Status updated successfully', rtq });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+export async function rejectAnswer(req, res) {
+  try {
+    const answer = await Answer.findById(req.params.answerId);
+    if (!answer) return res.status(404).json({ message: 'Answer not found' });
+
+    if (answer.rejections.some(id => id.toString() === req.user._id.toString())) {
+      return res.status(400).json({ message: 'You have already rejected this answer' });
+    }
+
+    const rtq = await RTQ.findById(answer.questionId);
+
+    // Change of decision: If previously approved by this moderator, remove their approval first!
+    if (answer.approvals.some(id => id.toString() === req.user._id.toString())) {
+      answer.approvals = answer.approvals.filter(id => id.toString() !== req.user._id.toString());
+      // Revert the approval reward for moderator (+3 QP -> deduct 3 QP)
+      await deductQP(req.user._id, 3, 'Reverted answer approval: changed decision to Reject', answer._id);
+      // Revert the approval reward for answerer (+5 QP -> deduct 5 QP)
+      await deductQP(answer.userId, 5, 'Reverted answer approval: changed decision to Reject', answer._id);
+
+      if (answer.approvals.length === 0) {
+        answer.isApproved = false;
+        answer.approvedBy = null;
+        if (rtq && rtq.approvedAnswer?.toString() === answer._id.toString()) {
+          rtq.approvedAnswer = null;
+          await rtq.save();
+        }
+      }
+    }
+
+    // Add to rejections
+    answer.rejections.push(req.user._id);
+    await answer.save();
+
+    // -3 QP to answerer, +3 QP to moderator
+    await deductQP(answer.userId, 3, 'Answer rejected by moderator', answer._id);
+    await awardQP(req.user._id, 3, 'Moderator rejected an answer', answer._id);
+
+    await notifyUser(answer.userId, 'student', 'answer_rejected',
+      `Your answer was marked as rejected by a moderator. -3 QP`, -3, answer._id);
+
+    res.json({ message: 'Answer rejected', answer });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+export async function rejectQuestion(req, res) {
+  try {
+    const rtq = await RTQ.findById(req.params.id);
+    if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
+
+    if (rtq.rejectedBy.some(id => id.toString() === req.user._id.toString())) {
+      return res.status(400).json({ message: 'You have already rejected this question' });
+    }
+
+    // Change of decision: If previously accepted, remove the accept first!
+    if (rtq.isAccepted) {
+      rtq.isAccepted = false;
+      const prevAcceptor = rtq.acceptedBy;
+      rtq.acceptedBy = null;
+      
+      // Revert acceptor moderator's reward (+3 QP)
+      if (prevAcceptor) {
+        await deductQP(prevAcceptor, 3, 'Reverted question accept: question rejected later', rtq._id);
+      }
+      // Revert questioner's reward (+5 QP)
+      await deductQP(rtq.postedBy, 5, 'Reverted question accept: question rejected later', rtq._id);
+    }
+
+    rtq.rejectedBy.push(req.user._id);
+
+    // If another moderator rejects the same question (so count >= 2)
+    if (rtq.rejectedBy.length >= 2) {
+      await deductQP(rtq.postedBy, 5, 'Question permanently removed: rejected by multiple moderators', rtq._id);
+      await awardQP(req.user._id, 3, 'Moderator rejected a question', rtq._id);
+      
+      await notifyUser(rtq.postedBy, 'student', 'question_removed',
+        `Your question was permanently removed after being rejected by multiple moderators. -5 QP`, -5, rtq._id);
+
+      await RTQ.findByIdAndDelete(rtq._id);
+      await syncRTQDelete(rtq._id);
+
+      return res.json({ message: 'Question rejected by multiple moderators and permanently removed', deleted: true });
+    } else {
+      // First rejection: set status to 'rejected'
+      rtq.status = 'rejected';
+      await rtq.save();
+
+      await awardQP(req.user._id, 3, 'Moderator rejected a question', rtq._id);
+      
+      res.json({ message: 'Question marked as rejected', rtq, deleted: false });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+export async function markRTQForReview(req, res) {
+  try {
+    const rtq = await RTQ.findById(req.params.id);
+    if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
+
+    rtq.markedForReview = true;
+    await rtq.save();
+
+    res.json({ message: 'Question marked for review', rtq });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+export async function markAnswerForReview(req, res) {
+  try {
+    const answer = await Answer.findById(req.params.answerId);
+    if (!answer) return res.status(404).json({ message: 'Answer not found' });
+
+    answer.markedForReview = true;
+    await answer.save();
+
+    res.json({ message: 'Answer marked for review', answer });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

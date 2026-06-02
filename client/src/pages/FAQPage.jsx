@@ -6,7 +6,7 @@ import { useQP } from '../context/QPContext';
 import UpvoteButton from '../components/UpvoteButton';
 import { FAQ_CATEGORIES } from '../utils/constants';
 import { timeAgo } from '../utils/helpers';
-import { ArrowBigUp } from 'lucide-react';
+import { ArrowBigUp, Settings } from 'lucide-react';
 import { cn } from '../utils/helpers';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import BackToTop from '../components/BackToTop';
@@ -22,6 +22,7 @@ export default function FAQPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [activeFAQSettingsId, setActiveFAQSettingsId] = useState(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { refreshQP } = useQP();
@@ -145,6 +146,24 @@ export default function FAQPage() {
       alert(err.message || 'Failed to delete FAQ');
     }
   };
+
+  const handleReviewFAQ = async (faqId) => {
+    try {
+      await faqService.reviewFAQ(faqId);
+      loadFAQs(page);
+    } catch (err) {
+      alert(err.message || 'Failed to mark FAQ for review');
+    }
+  };
+
+  const handleToggleTrendingFAQ = async (faqId) => {
+    try {
+      await faqService.toggleTrendingFAQ(faqId);
+      loadFAQs(page);
+    } catch (err) {
+      alert(err.message || 'Failed to update trending status');
+    }
+  };
   const filteredCategories = selectedCategory === 'all'
     ? [
         ...sortedCategoryNames.filter(name => grouped[name]?.length > 0),
@@ -175,6 +194,7 @@ export default function FAQPage() {
   };
 
   const isSenior = user?.role === 'senior' || user?.role === 'admin';
+  const isModeratorOrAbove = user && ['moderator', 'senior', 'admin'].includes(user.role);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -253,23 +273,76 @@ export default function FAQPage() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-start justify-between gap-2">
-                            <h3 className="font-semibold text-primary mb-1">{faq.question}</h3>
-                            {isSenior && (
-                              <div className="flex gap-1 shrink-0">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <h3 className="font-semibold text-primary">{faq.question}</h3>
+                                {isModeratorOrAbove && faq.markedForReview && (
+                                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold whitespace-nowrap">
+                                    ⚠️ Flagged for Review
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {isModeratorOrAbove && (
+                              <div className="relative shrink-0">
                                 <button
-                                  onClick={() => navigate(`/faq/edit/${faq._id}`)}
-                                  className="text-xs px-2 py-1 border border-border rounded text-muted hover:text-primary hover:border-primary transition-colors"
-                                  title="Edit FAQ"
+                                  onClick={() => setActiveFAQSettingsId(activeFAQSettingsId === faq._id ? null : faq._id)}
+                                  className="p-1 rounded hover:bg-slate-100 text-muted hover:text-primary transition-colors duration-200"
+                                  title="Moderator Actions"
                                 >
-                                  Edit
+                                  <Settings className="w-4 h-4" />
                                 </button>
-                                <button
-                                  onClick={() => handleDelete(faq._id)}
-                                  className="text-xs px-2 py-1 border border-red-200 rounded text-red-400 hover:bg-red-50 transition-colors"
-                                  title="Delete FAQ"
-                                >
-                                  Delete
-                                </button>
+                                {activeFAQSettingsId === faq._id && (
+                                  <div className="absolute right-0 mt-1 w-48 bg-white border border-border rounded-lg shadow-lg z-20 py-1">
+                                    {!faq.markedForReview ? (
+                                      <button
+                                        onClick={() => {
+                                          handleReviewFAQ(faq._id);
+                                          setActiveFAQSettingsId(null);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-xs text-amber-600 hover:bg-amber-50 font-semibold flex items-center gap-1.5"
+                                      >
+                                        ⚠️ Flag for Review
+                                      </button>
+                                    ) : (
+                                      <div className="px-3 py-2 text-xs text-muted italic flex items-center gap-1.5 border-b border-border">
+                                        ⚠️ Already Flagged
+                                      </div>
+                                    )}
+                                    <button
+                                      onClick={() => {
+                                        handleToggleTrendingFAQ(faq._id);
+                                        setActiveFAQSettingsId(null);
+                                      }}
+                                      className="w-full text-left px-3 py-2 text-xs text-primary hover:bg-slate-50 font-semibold flex items-center gap-1.5"
+                                    >
+                                      ⭐ {faq.isTrending ? 'Remove Trending' : 'Set on Trending'}
+                                    </button>
+                                    {isSenior && (
+                                      <>
+                                        <div className="border-t border-border my-1"></div>
+                                        <button
+                                          onClick={() => {
+                                            navigate(`/faq/edit/${faq._id}`);
+                                            setActiveFAQSettingsId(null);
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-xs text-primary hover:bg-slate-50 font-semibold"
+                                        >
+                                          Edit FAQ
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            handleDelete(faq._id);
+                                            setActiveFAQSettingsId(null);
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 font-semibold"
+                                        >
+                                          Delete FAQ
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

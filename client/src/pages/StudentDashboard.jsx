@@ -75,7 +75,14 @@ export default function StudentDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-primary">Welcome back, {user?.name?.split(' ')[0]} 👋</h1>
+          <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
+            Welcome back, {user?.name?.split(' ')[0]} 👋
+            <span className={`text-xs px-2.5 py-0.5 rounded-full border font-semibold tracking-wide uppercase ${
+              user?.role === 'moderator' ? 'bg-purple-50 text-purple-600 border-purple-200' : 'bg-slate-50 text-slate-600 border-slate-200'
+            }`}>
+              {user?.role === 'moderator' ? 'Moderator' : 'Student'}
+            </span>
+          </h1>
           <p className="text-muted mt-1">Here's what's happening on the platform</p>
         </div>
         <div className="text-right">
