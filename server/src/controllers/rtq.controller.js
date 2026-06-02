@@ -37,6 +37,10 @@ export async function listRTQs(req, res) {
       allRtqs = allRtqs.filter(r => r.isAccepted);
     } else if (filter === 'rejected') {
       allRtqs = allRtqs.filter(r => r.status === 'rejected');
+    } else if (filter === 'history') {
+      const faqs = await FAQ.find({ createdBy: req.user._id, rtqId: { $exists: true, $ne: null } }).select('rtqId');
+      const rtqIds = faqs.map(f => f.rtqId.toString());
+      allRtqs = allRtqs.filter(r => rtqIds.includes(r._id.toString()));
     }
 
     if (category) {
