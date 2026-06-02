@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import userService from '../services/user.service';
 import adminService from '../services/admin.service';
+import faqService from '../services/faq.service';
 import { useAuth } from '../context/AuthContext';
 import QPBadge from '../components/QPBadge';
-import { ROLE_LABELS } from '../utils/constants';
+import { RoleBadge } from '../components/Badge';
 import { timeAgo } from '../utils/helpers';
 import Breadcrumb from '../components/Breadcrumb';
+import { Check, X, Trophy, Crown } from 'lucide-react';
 
 export default function UserListPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [tab, setTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,12 +27,16 @@ export default function UserListPage() {
   const [arLoading, setArLoading] = useState(false);
   const [rejectNote, setRejectNote] = useState({});
 
+  const [faqConversionRequests, setFaqConversionRequests] = useState([]);
+  const [fcrLoading, setFcrLoading] = useState(false);
+
   const isAdmin = user?.role === 'admin';
   const isSenior = user?.role === 'senior';
 
   useEffect(() => { loadUsers(); }, [roleFilter]);
   useEffect(() => { if (isAdmin && tab === 'whitelist') loadWhitelist(); }, [tab, isAdmin]);
   useEffect(() => { if (isAdmin && tab === 'requests') loadAccessRequests(); }, [tab, isAdmin]);
+  useEffect(() => { if (isAdmin && tab === 'faq-requests') loadFaqConversionRequests(); }, [tab, isAdmin]);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -69,6 +74,18 @@ export default function UserListPage() {
     }
   };
 
+  const loadFaqConversionRequests = async () => {
+    setFcrLoading(true);
+    try {
+      const data = await faqService.listConversionRequests();
+      setFaqConversionRequests(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setFcrLoading(false);
+    }
+  };
+
 const handleRestrict = async (userId) => {
     const u = users.find(x => x._id === userId);
     const action = u?.restrictedAt ? ' unrestrict ' : ' restrict ';
@@ -96,12 +113,26 @@ const handleRestrict = async (userId) => {
     }
   };
 
-  const handleRemove = async (userId) => {
-    if (!confirm('Remove this user? This cannot be undone.')) return;
+  const handleBlock = async (userId) => {
+    if (!confirm('Block this user? They will not be able to access their account.')) return;
+    const prev = users;
+    setUsers(prev => prev.map(x => x._id === userId ? { ...x, status: 'blocked', restrictedAt: new Date() } : x));
     try {
-      await userService.removeUser(userId);
-      loadUsers();
+      await adminService.blockUser(userId);
     } catch (err) {
+      setUsers(prev);
+      alert(err.message);
+    }
+  };
+
+  const handleUnblock = async (userId) => {
+    if (!confirm('Unblock this user? They will regain access to their account.')) return;
+    const prev = users;
+    setUsers(prev => prev.map(x => x._id === userId ? { ...x, status: 'active', restrictedAt: null } : x));
+    try {
+      await adminService.unblockUser(userId);
+    } catch (err) {
+      setUsers(prev);
       alert(err.message);
     }
   };
@@ -149,6 +180,25 @@ const handleRestrict = async (userId) => {
     }
   };
 
+  const handleApproveFaqConversion = async (requestId) => {
+    if (!confirm('Approve this FAQ conversion? The FAQ will be created.')) return;
+    try {
+      await faqService.approveConversionRequest(requestId);
+      loadFaqConversionRequests();
+    } catch (err) {
+      alert(err.message || 'Failed to approve conversion request');
+    }
+  };
+
+  const handleRejectFaqConversion = async (requestId, adminNote) => {
+    try {
+      await faqService.rejectConversionRequest(requestId, adminNote);
+      loadFaqConversionRequests();
+    } catch (err) {
+      alert(err.message || 'Failed to reject conversion request');
+    }
+  };
+
   const filtered = users.filter(u =>
     !search ||
     u.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -157,29 +207,39 @@ const handleRestrict = async (userId) => {
   );
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <Breadcrumb items={[{ label: 'Users' }]} />
+<div className="max-w-4xl mx-auto px-4 py-6">
+      <Breadcrumb items={[{ label: 'Leaderboard' }]} />
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-primary">User Management</h1>
-      </div>
-
-      {isAdmin && (
-        <div className="flex gap-2 mb-6 border-b border-border">
-          {['users', 'whitelist', 'requests'].map(t => (
+        <h1 className="page-title">Leaderboard</h1>
+        {isAdmin && (
+          <div className="flex gap-2">
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                tab === t
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted hover:text-primary'
+              onClick={() => setTab('whitelist')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                tab === 'whitelist' ? 'bg-primary text-white' : 'bg-slate-100 text-muted hover:bg-slate-200'
               }`}
             >
-              {t === 'users' ? 'Users' : t === 'whitelist' ? 'Email Whitelist' : 'Access Requests'}
+              Whitelist
             </button>
-          ))}
-        </div>
-      )}
+            <button
+              onClick={() => setTab('requests')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                tab === 'requests' ? 'bg-primary text-white' : 'bg-slate-100 text-muted hover:bg-slate-200'
+              }`}
+            >
+              Access Requests
+            </button>
+            <button
+              onClick={() => setTab('faq-requests')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                tab === 'faq-requests' ? 'bg-primary text-white' : 'bg-slate-100 text-muted hover:bg-slate-200'
+              }`}
+            >
+              FAQ Requests
+            </button>
+          </div>
+        )}
+      </div>
 
       {tab === 'users' && (
         <>
@@ -191,7 +251,7 @@ const handleRestrict = async (userId) => {
               placeholder="Search users..."
               className="input flex-1"
             />
-            <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="input w-auto">
+            <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="select w-auto">
               <option value="">All Roles</option>
               <option value="student">Student</option>
               <option value="moderator">Moderator</option>
@@ -202,80 +262,92 @@ const handleRestrict = async (userId) => {
 
           {loading ? (
             <div className="text-center py-12 text-muted">Loading users...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted">No users found</div>
           ) : (
-            <div className="card overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-surface border-b border-border">
-                  <tr>
-                    <th className="text-left p-3 font-medium text-muted">User</th>
-                    <th className="text-left p-3 font-medium text-muted">Role</th>
-                    <th className="text-left p-3 font-medium text-muted">QP</th>
-                    <th className="text-left p-3 font-medium text-muted">Status</th>
-                    <th className="text-left p-3 font-medium text-muted">Joined</th>
-                    {(isSenior || isAdmin) && <th className="text-left p-3 font-medium text-muted">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(u => (
-                    <tr key={u._id} className="border-b border-border last:border-0 hover:bg-surface">
-                      <td className="p-3">
-                        <Link to={`/users/${u._id}`} className="font-medium text-primary hover:underline">{u.name}</Link>
-                        <div className="text-xs text-muted">@{u.username}</div>
-                      </td>
-                      <td className="p-3">
-                        {isAdmin ? (
+            <div className="space-y-2">
+              {filtered.map((u) => {
+                const rank = filtered.indexOf(u) + 1;
+                const isTop3 = rank <= 3;
+                const isCurrentUser = u._id === user._id;
+                const rankIcon = rank === 1 ? <Crown className="w-5 h-5 text-amber-500" /> : rank === 2 ? <Trophy className="w-5 h-5 text-slate-400" /> : rank === 3 ? <Trophy className="w-5 h-5 text-orange-400" /> : null;
+
+                return (
+                  <div
+                    key={u._id}
+                    className={`card-padded flex items-center gap-4 ${
+                      isCurrentUser ? 'ring-2 ring-primary/20 bg-primary/[0.02]' : ''
+                    } ${isTop3 ? 'border-2' : 'border'}`}
+                    style={isTop3 ? {
+                      borderColor: rank === 1 ? '#fbbf24' : rank === 2 ? '#cbd5e1' : rank === 3 ? '#fb923c' : undefined,
+                    } : undefined}
+                  >
+                    <div className="w-8 text-center shrink-0">
+                      {rankIcon || <span className="text-sm font-semibold text-muted">{rank}</span>}
+                    </div>
+                    <Link to={`/users/${u._id}`} className="flex-1 min-w-0 hover:opacity-80 transition-opacity">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold truncate text-primary">{u.name}</p>
+                        {isCurrentUser && <span className="text-xs text-muted">(you)</span>}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-muted">@{u.username}</span>
+                        <span className="text-muted">&middot;</span>
+                        <RoleBadge role={u.role} />
+                      </div>
+                    </Link>
+                    <div className="text-right shrink-0">
+                      {u.status === 'blocked' && (
+                        <span className="inline-block text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded mb-1">Blocked</span>
+                      )}
+                      <QPBadge qp={u.qp || 0} />
+                      <p className="text-xs text-muted mt-0.5">joined {timeAgo(u.createdAt)}</p>
+                    </div>
+                    {(isSenior || isAdmin) && (
+                      <div className="flex gap-1.5 shrink-0">
+                        {isAdmin && (
                           <select
                             value={u.role}
                             onChange={e => handleAssignRole(u._id, e.target.value)}
-                            className="input py-1 text-xs w-auto"
+                            className="input-sm text-xs"
                           >
                             <option value="student">Student</option>
                             <option value="moderator">Moderator</option>
                             <option value="senior">Senior</option>
                             <option value="admin">Admin</option>
                           </select>
-                        ) : (
-                          <span className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded">{ROLE_LABELS[u.role] || u.role}</span>
                         )}
-                      </td>
-                      <td className="p-3"><QPBadge qp={u.qp || 0} small /></td>
-                      <td className="p-3">
-                        {u.restrictedAt ? (
-                          <span className="text-xs text-red-600">Restricted</span>
-                        ) : u.status === 'blocked' ? (
-                          <span className="text-xs text-red-600">Blocked</span>
-                        ) : (
-                          <span className="text-xs text-green-600">Active</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-xs text-muted">{timeAgo(u.createdAt)}</td>
-                      {(isSenior || isAdmin) && (
-                        <td className="p-3">
-                          <div className="flex gap-2">
+                        <button
+                          onClick={() => handleRestrict(u._id)}
+                          className={`btn-ghost-sm ${u.restrictedAt ? 'text-red-500' : ''}`}
+                          title={u.restrictedAt ? 'Unrestrict' : 'Restrict'}
+                        >
+                          {u.restrictedAt ? 'Unrestrict' : 'Restrict'}
+                        </button>
+                        {isAdmin && (
+                          u.status === 'blocked' ? (
                             <button
-                              onClick={() => handleRestrict(u._id)}
-                              className="text-xs px-2 py-1 border border-border rounded hover:border-orange-500 text-muted"
+                              onClick={() => handleUnblock(u._id)}
+                              className="btn-ghost-sm text-green-600"
+                              title="Unblock"
                             >
-                              {u.restrictedAt ? 'Unrestrict' : 'Restrict'}
+                              Unblock
                             </button>
-                            {isAdmin && (
-                              <button
-                                onClick={() => handleRemove(u._id)}
-                                className="text-xs px-2 py-1 border border-red-200 rounded text-red-500 hover:bg-red-50"
-                              >
-                                Remove
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filtered.length === 0 && (
-                <div className="text-center py-8 text-muted">No users found.</div>
-              )}
+                          ) : (
+                            <button
+                              onClick={() => handleBlock(u._id)}
+                              className="btn-ghost-sm text-red-500"
+                              title="Block"
+                            >
+                              Block
+                            </button>
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </>
@@ -385,6 +457,71 @@ const handleRestrict = async (userId) => {
                     onChange={e => setRejectNote(prev => ({ ...prev, [req._id]: e.target.value }))}
                     className="input flex-1 text-sm"
                   />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === 'faq-requests' && isAdmin && (
+        <div className="space-y-6">
+          {fcrLoading ? (
+            <div className="text-center py-12 text-muted">Loading...</div>
+          ) : faqConversionRequests.length === 0 ? (
+            <div className="card p-8 text-center text-muted">No FAQ conversion requests.</div>
+          ) : (
+            faqConversionRequests.map(req => (
+              <div key={req._id} className="card p-6 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                        req.status === 'pending' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                        req.status === 'approved' ? 'bg-green-50 text-green-700 border border-green-200' :
+                        'bg-red-50 text-red-700 border border-red-200'
+                      }`}>
+                        {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                      </span>
+                      <span className="text-xs text-muted">by {req.requestedBy?.name || 'Unknown'}</span>
+                      <span className="text-xs text-muted">· {timeAgo(req.requestedAt)}</span>
+                    </div>
+                    <div className="font-medium text-primary text-sm mb-1">{req.rtqQuestion}</div>
+                    {req.rtqAnswer && (
+                      <div className="text-xs text-muted mb-1">
+                        <span className="font-medium">Top Answer:</span> {req.rtqAnswer.substring(0, 100)}...
+                      </div>
+                    )}
+                    {req.suggestedAnswer && (
+                      <div className="text-xs text-blue-600">
+                        <span className="font-medium">Suggested Answer:</span> {req.suggestedAnswer.substring(0, 100)}...
+                      </div>
+                    )}
+                    {req.adminNote && (
+                      <div className="text-xs text-muted mt-1 italic">Note: {req.adminNote}</div>
+                    )}
+                  </div>
+                  {req.status === 'pending' && (
+                    <div className="flex gap-2 ml-4">
+                      <button
+                        onClick={() => handleApproveFaqConversion(req._id)}
+                        className="p-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                        title="Approve"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const note = prompt('Rejection note (optional):');
+                          handleRejectFaqConversion(req._id, note);
+                        }}
+                        className="p-1.5 border border-red-200 text-red-500 rounded hover:bg-red-50 transition-colors"
+                        title="Reject"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))

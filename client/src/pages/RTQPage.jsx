@@ -6,9 +6,10 @@ import { useQP } from '../context/QPContext';
 import { timeAgo } from '../utils/helpers';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import { Spinner } from '../components/SkeletonLoader';
+import { StatusBadge } from '../components/Badge';
 import BackToTop from '../components/BackToTop';
 import { FAQ_CATEGORIES } from '../utils/constants';
-import { Settings, Check, X, Flag, Trash2, BookOpen } from 'lucide-react';
+import { Settings, Check, X, Flag, Trash2, BookOpen, FileText } from 'lucide-react';
 
 const LIMIT = 20;
 
@@ -160,6 +161,17 @@ export default function RTQPage() {
     }
   };
 
+  const handleRequestConversion = async (rtqId) => {
+    const suggested = prompt('Optionally enter a suggested answer (or leave blank to use the top-voted answer):');
+    if (suggested === null) return;
+    try {
+      await rtqService.requestConversion(rtqId, suggested || undefined);
+      alert('FAQ conversion request submitted to admin for review.');
+    } catch (err) {
+      alert(err.message || 'Failed to submit conversion request');
+    }
+  };
+
   const handleInitiateFAQ = (rtq) => {
     const answers = [...(rtq.answers || [])].sort((a, b) => b.upvotes - a.upvotes);
     let selectedAns = null;
@@ -245,6 +257,36 @@ export default function RTQPage() {
     }
   };
 
+  const handleConvertToFAQ = async (rtqId) => {
+    if (!confirm('Convert this RTQ to an FAQ?')) return;
+    try {
+      await rtqService.convertToFAQ(rtqId);
+      alert('Converted to FAQ');
+      loadRTQs(page);
+    } catch (err) {
+      alert(err.message || 'Failed to convert to FAQ');
+    }
+  };
+
+  const handleRemoveRTQ = async (rtqId) => {
+    if (!confirm('Permanently delete this RTQ?')) return;
+    try {
+      await rtqService.remove(rtqId);
+      loadRTQs(page);
+    } catch (err) {
+      alert(err.message || 'Failed to remove RTQ');
+    }
+  };
+
+  const handleSelectAnswer = async (rtqId, answerId) => {
+    try {
+      await rtqService.updateStatus(rtqId, 'partially_resolved', answerId);
+      loadRTQs(page);
+    } catch (err) {
+      alert(err.message || 'Failed to select answer');
+    }
+  };
+
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
@@ -311,13 +353,13 @@ export default function RTQPage() {
                       <div className="flex items-start gap-2 mb-1 flex-wrap">
                         <Link to={`/rtq/${rtq._id}`} className="font-semibold text-primary hover:underline">{rtq.question}</Link>
                         {rtq.isAccepted && (
-                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-semibold whitespace-nowrap">✓ Moderator Accepted</span>
+                          <StatusBadge status="resolved" />
                         )}
                         {rtq.status === 'rejected' && (
-                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold whitespace-nowrap">✗ Moderator Rejected</span>
+                          <StatusBadge status="rejected" />
                         )}
                         {rtq.markedForReview && (
-                          <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold whitespace-nowrap">⚠️ Marked for Review</span>
+                          <StatusBadge status="markedForReview" />
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted mb-3 flex-wrap">
@@ -351,9 +393,7 @@ export default function RTQPage() {
                             </button>
                           )}
                           {rtq.status === 'rejected' && (
-                            <span className="text-xs px-2 py-1 bg-red-50 border border-red-200 text-red-700 rounded font-semibold whitespace-nowrap">
-                              ✗ Rejected
-                            </span>
+                            <StatusBadge status="rejected" />
                           )}
                           {!rtq.markedForReview && (
                             <button
@@ -373,6 +413,24 @@ export default function RTQPage() {
                               <Trash2 className="w-4 h-4" />
                             </button>
                           )}
+                          {user?.role === 'moderator' && (
+                            <button
+                              onClick={() => handleRequestConversion(rtq._id)}
+                              className="p-1.5 border border-blue-200 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                              title="Request FAQ Conversion (Admin will review)"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          )}
+                          {isOwner && rtq.status !== 'resolved' && (
+                            <button
+                              onClick={() => { rtqService.updateStatus(rtq._id, 'resolved').then(() => loadRTQs(page)); }}
+                              className="p-1.5 border border-green-200 text-green-600 rounded hover:bg-green-50 transition-colors"
+                              title="Mark as Resolved"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       )}
 
@@ -383,13 +441,13 @@ export default function RTQPage() {
                         {isExpanded ? 'Hide answers ↑' : `${rtq.answers?.length || 0} answers ↓`}
                       </button>
 
-                      {isModeratorOrAbove && (
+                      {(isModeratorOrAbove || isOwner) && (
                         <button
                           onClick={() => setSelectedQuestionId(selectedQuestionId === rtq._id ? null : rtq._id)}
                           className={`p-1.5 rounded hover:bg-slate-100 transition-colors duration-200 ml-3 inline-flex items-center justify-center align-middle ${
                             selectedQuestionId === rtq._id ? 'text-primary bg-slate-100' : 'text-muted'
                           }`}
-                          title={selectedQuestionId === rtq._id ? 'Cancel Selection' : 'Moderate Question'}
+                          title={selectedQuestionId === rtq._id ? 'Cancel Selection' : 'Open Actions'}
                         >
                           <Settings className="w-4 h-4" />
                         </button>
@@ -423,67 +481,74 @@ export default function RTQPage() {
                                 </span>
                                 
                                 {(ans.approvals?.length > 0 || ans.isApproved) && (
-                                  <span className="text-xs px-2 py-0.5 bg-green-50 border border-green-200 text-green-700 rounded font-semibold">
-                                    ✓ Moderator Approved ({ans.approvals?.length || 1})
-                                  </span>
+                                  <StatusBadge status="approved" />
                                 )}
                                 {ans.rejections?.length > 0 && (
-                                  <span className="text-xs px-2 py-0.5 bg-red-50 border border-red-200 text-red-700 rounded font-semibold">
-                                    ✗ Moderator Rejected ({ans.rejections?.length})
-                                  </span>
+                                  <StatusBadge status="rejected" />
                                 )}
                                 {ans.markedForReview && (
-                                  <span className="text-xs px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded font-semibold">
-                                    ⚠️ Marked for Review
-                                  </span>
+                                  <StatusBadge status="markedForReview" />
                                 )}
 
-                                {isModeratorOrAbove && (
+                                {(isModeratorOrAbove || isOwner) && (
                                   <button
                                     onClick={() => setSelectedAnswerId(selectedAnswerId === ans._id ? null : ans._id)}
                                     className={`p-1 rounded hover:bg-slate-100 transition-colors duration-200 ml-2 inline-flex items-center justify-center align-middle ${
                                       selectedAnswerId === ans._id ? 'text-primary bg-slate-100' : 'text-muted'
                                     }`}
-                                    title={selectedAnswerId === ans._id ? 'Cancel Moderation' : 'Moderate Answer'}
+                                    title={selectedAnswerId === ans._id ? 'Cancel Actions' : 'Open Actions'}
                                   >
                                     <Settings className="w-3.5 h-3.5" />
                                   </button>
                                 )}
                               </div>
 
-                              {isModeratorOrAbove && selectedAnswerId === ans._id && (
+                              {(isModeratorOrAbove || isOwner) && selectedAnswerId === ans._id && (
                                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border w-fit">
-                                  <button
-                                    onClick={() => handleApproveAnswer(ans._id)}
-                                    disabled={ans.approvals?.some(uid => (uid?._id || uid)?.toString() === user?._id?.toString())}
-                                    className={`p-1.5 rounded border transition-colors ${
-                                      ans.approvals?.some(uid => (uid?._id || uid)?.toString() === user?._id?.toString())
-                                        ? 'bg-green-50 text-green-700 border-green-200 cursor-not-allowed'
-                                        : 'border-green-200 text-green-600 hover:bg-green-50'
-                                    }`}
-                                    title={`Approve (${ans.approvals?.length || (ans.isApproved ? 1 : 0)})`}
-                                  >
-                                    <Check className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleRejectAnswer(ans._id)}
-                                    disabled={ans.rejections?.some(uid => (uid?._id || uid)?.toString() === user?._id?.toString())}
-                                    className={`p-1.5 rounded border transition-colors ${
-                                      ans.rejections?.some(uid => (uid?._id || uid)?.toString() === user?._id?.toString())
-                                        ? 'bg-red-50 text-red-700 border-red-200 cursor-not-allowed'
-                                        : 'border-red-200 text-red-600 hover:bg-red-50'
-                                    }`}
-                                    title={`Reject (${ans.rejections?.length || 0})`}
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                  {!ans.markedForReview && (
+                                  {isModeratorOrAbove && (
+                                    <>
+                                      <button
+                                        onClick={() => handleApproveAnswer(ans._id)}
+                                        disabled={ans.approvals?.some(uid => (uid?._id || uid)?.toString() === user?._id?.toString())}
+                                        className={`p-1.5 rounded border transition-colors ${
+                                          ans.approvals?.some(uid => (uid?._id || uid)?.toString() === user?._id?.toString())
+                                            ? 'bg-green-50 text-green-700 border-green-200 cursor-not-allowed'
+                                            : 'border-green-200 text-green-600 hover:bg-green-50'
+                                        }`}
+                                        title={`Approve (${ans.approvals?.length || (ans.isApproved ? 1 : 0)})`}
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleRejectAnswer(ans._id)}
+                                        disabled={ans.rejections?.some(uid => (uid?._id || uid)?.toString() === user?._id?.toString())}
+                                        className={`p-1.5 rounded border transition-colors ${
+                                          ans.rejections?.some(uid => (uid?._id || uid)?.toString() === user?._id?.toString())
+                                            ? 'bg-red-50 text-red-700 border-red-200 cursor-not-allowed'
+                                            : 'border-red-200 text-red-600 hover:bg-red-50'
+                                        }`}
+                                        title={`Reject (${ans.rejections?.length || 0})`}
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                      {!ans.markedForReview && (
+                                        <button
+                                          onClick={() => handleReviewAnswer(ans._id)}
+                                          className="p-1.5 rounded border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors"
+                                          title="Flag for Review"
+                                        >
+                                          <Flag className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                                  {isOwner && rtq.status !== 'resolved' && (
                                     <button
-                                      onClick={() => handleReviewAnswer(ans._id)}
-                                      className="p-1.5 rounded border border-amber-200 text-amber-600 hover:bg-amber-50 transition-colors"
-                                      title="Flag for Review"
+                                      onClick={() => handleSelectAnswer(rtq._id, ans._id)}
+                                      className="p-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                                      title="Select as Answer"
                                     >
-                                      <Flag className="w-3.5 h-3.5" />
+                                      <Check className="w-3.5 h-3.5" />
                                     </button>
                                   )}
                                 </div>

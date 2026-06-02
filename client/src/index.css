@@ -2,64 +2,262 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
 @layer base {
+  * {
+    font-family: 'Outfit', sans-serif;
+  }
+
   body {
-    @apply bg-surface text-primary font-sans antialiased;
+    @apply bg-surface text-primary antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary/20 ring-offset-2;
+  }
+
+  ::selection {
+    @apply bg-primary/10 text-primary;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted/50;
   }
 }
 
 @layer components {
   .card {
-    @apply bg-card border border-border rounded-card shadow-card;
+    @apply bg-card border border-border rounded-2xl shadow-sm;
   }
-  
+
   .card-hover {
-    @apply transition-all duration-200 hover:shadow-card-hover hover:border-slate-300;
+    @apply transition-all duration-200 hover:shadow-md hover:border-slate-300;
   }
 
+  .card-padded {
+    @apply card p-5;
+  }
+
+  /* Primary buttons */
   .btn-primary {
-    @apply bg-primary text-white rounded-card px-4 py-2 font-medium
-           transition-all duration-200 hover:bg-slate-800
-           focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2;
+    @apply bg-primary text-white rounded-xl px-4 py-2 font-medium
+           transition-all duration-150 hover:bg-slate-800 active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
-  .btn-secondary {
-    @apply bg-white border border-border text-primary rounded-card px-4 py-2 font-medium
-           transition-all duration-200 hover:bg-slate-50 hover:border-slate-300;
+  .btn-sm {
+    @apply btn-primary text-sm px-3 py-1.5 rounded-lg;
   }
 
-  .btn-muted {
-    @apply bg-surface border border-border text-muted rounded-card px-4 py-2 font-medium
-           transition-all duration-200 hover:bg-slate-100;
+  /* Action buttons */
+  .btn-success {
+    @apply bg-emerald-600 text-white rounded-xl px-4 py-2 font-medium
+           transition-all duration-150 hover:bg-emerald-700 active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
+  .btn-success-sm {
+    @apply btn-success text-sm px-3 py-1.5 rounded-lg;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white rounded-xl px-4 py-2 font-medium
+           transition-all duration-150 hover:bg-red-700 active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-danger-sm {
+    @apply btn-danger text-sm px-3 py-1.5 rounded-lg;
+  }
+
+  .btn-warning {
+    @apply bg-amber-500 text-white rounded-xl px-4 py-2 font-medium
+           transition-all duration-150 hover:bg-amber-600 active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-warning-sm {
+    @apply btn-warning text-sm px-3 py-1.5 rounded-lg;
+  }
+
+  .btn-outline {
+    @apply bg-white border border-border text-primary rounded-xl px-4 py-2 font-medium
+           transition-all duration-150 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98]
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-outline-sm {
+    @apply btn-outline text-sm px-3 py-1.5 rounded-lg;
+  }
+
+  .btn-ghost {
+    @apply text-muted rounded-xl px-4 py-2 font-medium
+           transition-all duration-150 hover:bg-slate-100 hover:text-primary
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost-sm {
+    @apply btn-ghost text-sm px-3 py-1.5 rounded-lg;
+  }
+
+  /* Icon button (square, square-sm variant) */
+  .btn-icon {
+    @apply p-2 rounded-xl transition-all duration-150 hover:bg-slate-100 text-muted
+           hover:text-primary active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-icon-sm {
+    @apply btn-icon p-1.5 rounded-lg;
+  }
+
+  /* Input */
   .input {
-    @apply w-full border border-border rounded-lg px-3 py-2 text-sm
-           bg-white focus:outline-none focus:border-primary focus:ring-2
-           focus:ring-slate-900/10 transition-all duration-200;
+    @apply w-full border border-border rounded-xl px-3 py-2 text-sm
+           bg-white placeholder:text-muted/60
+           focus:outline-none focus:border-primary focus:ring-2
+           focus:ring-primary/10 transition-all duration-150;
   }
 
+  .input-sm {
+    @apply input text-xs px-2.5 py-1.5;
+  }
+
+  /* Select */
+  .select {
+    @apply input appearance-none cursor-pointer bg-no-repeat bg-[right_0.75rem_center]
+           bg-[length:16px_16px] pr-9;
+  }
+
+  /* Label */
   .label {
-    @apply block text-sm font-medium text-primary mb-1;
+    @apply block text-sm font-medium text-primary mb-1.5;
   }
 
+  .label-sm {
+    @apply label text-xs mb-1;
+  }
+
+  /* Page title */
   .page-title {
-    @apply text-2xl font-bold text-primary;
+    @apply text-2xl font-bold text-primary tracking-tight;
   }
 
+  .page-subtitle {
+    @apply text-sm text-muted mt-1;
+  }
+
+  /* Section title */
   .section-title {
-    @apply text-lg font-semibold text-primary;
+    @apply text-base font-semibold text-primary;
+  }
+
+  /* Divider */
+  .divider {
+    @apply border-t border-border;
+  }
+
+  /* Status badges */
+  .badge {
+    @apply inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full border;
+  }
+
+  .badge-success {
+    @apply badge bg-emerald-50 text-emerald-700 border-emerald-200;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-50 text-amber-700 border-amber-200;
+  }
+
+  .badge-danger {
+    @apply badge bg-red-50 text-red-700 border-red-200;
+  }
+
+  .badge-info {
+    @apply badge bg-blue-50 text-blue-700 border-blue-200;
+  }
+
+  .badge-neutral {
+    @apply badge bg-slate-100 text-slate-600 border-slate-200;
+  }
+
+  /* Role badges */
+  .badge-role {
+    @apply badge text-xs px-2 py-0.5 rounded-md;
+  }
+
+  .badge-student {
+    @apply badge-role bg-slate-100 text-slate-600 border-slate-200;
+  }
+
+  .badge-moderator {
+    @apply badge-role bg-purple-100 text-purple-700 border-purple-200;
+  }
+
+  .badge-senior {
+    @apply badge-role bg-blue-100 text-blue-700 border-blue-200;
+  }
+
+  .badge-admin {
+    @apply badge-role bg-red-100 text-red-700 border-red-200;
+  }
+
+  /* QuickLink accent cards */
+  .quick-card {
+    @apply card border-2 p-4 flex flex-col gap-2 cursor-pointer card-hover;
+  }
+
+  /* Page container */
+  .page-container {
+    @apply max-w-5xl mx-auto px-4 py-6;
+  }
+
+  /* Dropdown / Popover base */
+  .dropdown {
+    @apply card p-2 shadow-xl;
+  }
+
+  .dropdown-item {
+    @apply flex items-center gap-2 px-3 py-2 text-sm text-primary rounded-lg
+           transition-colors duration-100 hover:bg-slate-100 cursor-pointer;
   }
 }
 
-.brand-font {
-  font-family: 'Playfair Display', serif;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
+@layer utilities {
+  .animate-in {
+    animation: slideIn 0.15s ease-out;
+  }
 
-.brand-font-modern {
-  font-family: 'Outfit', sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}

@@ -11,6 +11,7 @@ import { cn } from '../utils/helpers';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import BackToTop from '../components/BackToTop';
 import Breadcrumb from '../components/Breadcrumb';
+import { StatusBadge } from '../components/Badge';
 
 export default function FAQPage() {
   const [grouped, setGrouped] = useState({});
@@ -277,9 +278,7 @@ export default function FAQPage() {
                               <div className="flex items-center gap-2 flex-wrap mb-1">
                                 <h3 className="font-semibold text-primary">{faq.question}</h3>
                                 {isModeratorOrAbove && faq.markedForReview && (
-                                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold whitespace-nowrap">
-                                    ⚠️ Flagged for Review
-                                  </span>
+                                  <StatusBadge status="markedForReview" />
                                 )}
                               </div>
                             </div>
@@ -306,7 +305,7 @@ export default function FAQPage() {
                                       </button>
                                     ) : (
                                       <div className="px-3 py-2 text-xs text-muted italic flex items-center gap-1.5 border-b border-border">
-                                        ⚠️ Already Flagged
+                                        <StatusBadge status="markedForReview" />
                                       </div>
                                     )}
                                     <button

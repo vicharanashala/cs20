@@ -105,22 +105,38 @@ export default function SignupPage() {
 
           {step === 1 && restricted && !accessRequested && (
             <div className="space-y-5">
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm font-medium text-center">
-                Access Restricted
+              <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-lg text-sm font-medium text-center">
+                Access Restricted — Your email is not on the accepted list
               </div>
               <p className="text-sm text-muted text-center">
-                Your email is not on the accepted list. Submit a request to the admin for approval.
+                Complete the form below to submit a request to the admin for approval.
               </p>
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                   {error}
                 </div>
               )}
-              <button onClick={() => setRestricted(false)} className="btn-secondary w-full">
-                ← Go Back
-              </button>
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1.5">Full Name</label>
+                <input name="name" value={form.name} onChange={handleChange} className="input" placeholder="Your name" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1.5">Username</label>
+                <input name="username" value={form.username} onChange={handleChange} className="input" placeholder="unique_handle" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1.5">Email</label>
+                <input type="email" name="email" value={form.email} onChange={handleChange} className="input" placeholder="you@example.com" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-primary mb-1.5">Password</label>
+                <input type="password" name="password" value={form.password} onChange={handleChange} className="input" placeholder="Min 6 characters" required minLength={6} />
+              </div>
               <button onClick={handleRequestAccess} disabled={loading} className="btn-primary w-full">
                 {loading ? 'Submitting...' : 'Request Approval'}
+              </button>
+              <button onClick={() => setRestricted(false)} className="btn-secondary w-full">
+                ← Go Back
               </button>
             </div>
           )}

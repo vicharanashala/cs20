@@ -14,7 +14,7 @@ export default function ProfilePage() {
   const [historyTotal, setHistoryTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', email: '' });
+  const [editForm, setEditForm] = useState({ name: '' });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
   const [saveMsg, setSaveMsg] = useState('');
   const historyLimit = 15;
@@ -86,17 +86,13 @@ export default function ProfilePage() {
             <p><span className="text-muted">Email:</span> {user?.email}</p>
             <p><span className="text-muted">Role:</span> {ROLE_LABELS[user?.role] || user?.role}</p>
             <p><span className="text-muted">QP Balance:</span> {user?.qp || 0}</p>
-            <button onClick={() => setEditMode(true)} className="btn-secondary text-sm mt-3">Edit Profile</button>
+            <button onClick={() => { setEditForm({ name: user?.name || '' }); setEditMode(true); }} className="btn-secondary text-sm mt-3">Edit Profile</button>
           </div>
         ) : (
           <form onSubmit={handleProfileUpdate} className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-primary mb-1">Name</label>
               <input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} className="input" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-primary mb-1">Email</label>
-              <input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} className="input" />
             </div>
             <div className="flex gap-2">
               <button type="submit" className="btn-primary text-sm">Save</button>

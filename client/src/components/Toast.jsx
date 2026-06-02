@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { CheckCircle, XCircle, AlertTriangle, MessageCircle } from 'lucide-react';
 
 const ToastContext = createContext(null);
 
@@ -36,10 +37,10 @@ export function ToastProvider({ children }) {
               'bg-white text-slate-800 border border-border'
             }`}
           >
-            {toast.type === 'success' && <span>✅</span>}
-            {toast.type === 'error' && <span>❌</span>}
-            {toast.type === 'warning' && <span>⚠️</span>}
-            {toast.type === 'info' && <span>💬</span>}
+            {toast.type === 'success' && <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />}
+            {toast.type === 'error' && <XCircle className="w-4 h-4 text-red-600 shrink-0" />}
+            {toast.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />}
+            {toast.type === 'info' && <MessageCircle className="w-4 h-4 text-blue-600 shrink-0" />}
             <span>{toast.message}</span>
             <button
               onClick={() => removeToast(toast.id)}

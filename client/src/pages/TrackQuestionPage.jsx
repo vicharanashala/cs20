@@ -4,6 +4,7 @@ import rtqService from '../services/rtq.service';
 import { useAuth } from '../context/AuthContext';
 import { timeAgo } from '../utils/helpers';
 import Breadcrumb from '../components/Breadcrumb';
+import { StatusBadge } from '../components/Badge';
 
 export default function TrackQuestionPage() {
   const { user } = useAuth();
@@ -96,19 +97,13 @@ export default function TrackQuestionPage() {
                           </select>
                         </div>
                         {rtq.isAccepted && (
-                          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">
-                            ✓ Moderator Accepted
-                          </span>
+                          <StatusBadge status="resolved" />
                         )}
                         {rtq.status === 'rejected' && (
-                          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-semibold">
-                            ✗ Moderator Rejected
-                          </span>
+                          <StatusBadge status="rejected" />
                         )}
                         {rtq.markedForReview && (
-                          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-semibold">
-                            ⚠️ Marked for Review
-                          </span>
+                          <StatusBadge status="markedForReview" />
                         )}
                       </div>
                     </div>

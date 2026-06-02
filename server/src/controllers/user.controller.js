@@ -43,10 +43,9 @@ export async function getUser(req, res) {
 
 export async function updateProfile(req, res) {
   try {
-    const { name, email } = req.body;
+    const { name } = req.body;
     const user = await User.findById(req.user._id);
     if (name) user.name = name;
-    if (email) user.email = email;
     user.updatedAt = new Date();
     await user.save();
     res.json(user);
