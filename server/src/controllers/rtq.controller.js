@@ -233,6 +233,23 @@ export async function approveAnswer(req, res) {
     const rtq = await RTQ.findById(answer.questionId);
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
+    // check max 2 approvals per question per moderator
+    const userApprovalsCount = await Answer.countDocuments({
+      questionId: answer.questionId,
+      approvals: req.user._id
+    });
+    if (userApprovalsCount >= 2 && !answer.approvals.includes(req.user._id)) {
+      return res.status(400).json({ message: 'You have reached the maximum of 2 approvals per question' });
+    }
+
+    if (answer.approvals.includes(req.user._id)) {
+      return res.status(400).json({ message: 'You have already approved this answer' });
+    }
+
+    // Remove from rejections, add to approvals
+    answer.rejections = answer.rejections.filter(id => id.toString() !== req.user._id.toString());
+    answer.approvals.push(req.user._id);
+
     answer.isApproved = true;
     answer.approvedBy = req.user._id;
     await answer.save();
@@ -242,12 +259,12 @@ export async function approveAnswer(req, res) {
       await rtq.save();
     }
 
-    const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_APPROVE_ANSWER;
-    await awardQP(req.user._id, qpAmount, `${req.user.role} approved an answer`, answer._id);
-    await awardQP(answer.userId, QP_RULES.ANSWER_APPROVED, 'Answer approved', answer._id);
+    // Award +5 QP to answerer, +3 QP to moderator
+    await awardQP(answer.userId, 5, 'Answer approved by moderator', answer._id);
+    await awardQP(req.user._id, 3, 'Moderator approved an answer', answer._id);
 
     await notifyUser(answer.userId, 'student', 'answer_approved',
-      `Your answer was approved. +${QP_RULES.ANSWER_APPROVED} QP`, QP_RULES.ANSWER_APPROVED, answer._id);
+      `Your answer was approved. +5 QP`, 5, answer._id);
 
     res.json({ message: 'Answer approved', answer });
   } catch (err) {
@@ -266,11 +283,12 @@ export async function markAccepted(req, res) {
     rtq.acceptedBy = req.user._id;
     await rtq.save();
 
-    const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_MARK_ACCEPTED;
-    await awardQP(req.user._id, qpAmount, `${req.user.role} accepted question`, rtq._id);
+    // Award +5 QP to questioner, +3 QP to moderator
+    await awardQP(rtq.postedBy, 5, 'Question accepted by moderator', rtq._id);
+    await awardQP(req.user._id, 3, 'Moderator accepted a question', rtq._id);
 
     await notifyUser(rtq.postedBy, 'student', 'question_accepted',
-      `Your question was accepted by a ${req.user.role}.`, 0, rtq._id);
+      `Your question was accepted by a moderator. +5 QP`, 5, rtq._id);
 
     res.json({ message: 'Question accepted', rtq });
   } catch (err) {
@@ -413,6 +431,102 @@ export async function updateRTQStatus(req, res) {
     await rtq.save();
 
     res.json({ message: 'Status updated successfully', rtq });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+export async function rejectAnswer(req, res) {
+  try {
+    const answer = await Answer.findById(req.params.answerId);
+    if (!answer) return res.status(404).json({ message: 'Answer not found' });
+
+    if (answer.rejections.includes(req.user._id)) {
+      return res.status(400).json({ message: 'You have already rejected this answer' });
+    }
+
+    // Remove from approvals, add to rejections
+    answer.approvals = answer.approvals.filter(id => id.toString() !== req.user._id.toString());
+    answer.rejections.push(req.user._id);
+    await answer.save();
+
+    // -3 QP to answerer, +3 QP to moderator
+    await deductQP(answer.userId, 3, 'Answer rejected by moderator', answer._id);
+    await awardQP(req.user._id, 3, 'Moderator rejected an answer', answer._id);
+
+    await notifyUser(answer.userId, 'student', 'answer_rejected',
+      `Your answer was marked as rejected by a moderator. -3 QP`, -3, answer._id);
+
+    res.json({ message: 'Answer rejected', answer });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+export async function rejectQuestion(req, res) {
+  try {
+    const rtq = await RTQ.findById(req.params.id);
+    if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
+
+    if (rtq.rejectedBy.includes(req.user._id)) {
+      return res.status(400).json({ message: 'You have already rejected this question' });
+    }
+
+    rtq.rejectedBy.push(req.user._id);
+
+    // If another moderator rejects the same question (so count >= 2)
+    if (rtq.rejectedBy.length >= 2) {
+      await deductQP(rtq.postedBy, 5, 'Question permanently removed: rejected by multiple moderators', rtq._id);
+      await awardQP(req.user._id, 3, 'Moderator rejected a question', rtq._id);
+      
+      await notifyUser(rtq.postedBy, 'student', 'question_removed',
+        `Your question was permanently removed after being rejected by multiple moderators. -5 QP`, -5, rtq._id);
+
+      await RTQ.findByIdAndDelete(rtq._id);
+      await syncRTQDelete(rtq._id);
+
+      return res.json({ message: 'Question rejected by multiple moderators and permanently removed', deleted: true });
+    } else {
+      // First rejection: set status to 'rejected'
+      rtq.status = 'rejected';
+      await rtq.save();
+
+      await awardQP(req.user._id, 3, 'Moderator rejected a question', rtq._id);
+      
+      res.json({ message: 'Question marked as rejected', rtq, deleted: false });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+export async function markRTQForReview(req, res) {
+  try {
+    const rtq = await RTQ.findById(req.params.id);
+    if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
+
+    rtq.markedForReview = true;
+    await rtq.save();
+
+    res.json({ message: 'Question marked for review', rtq });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+export async function markAnswerForReview(req, res) {
+  try {
+    const answer = await Answer.findById(req.params.answerId);
+    if (!answer) return res.status(404).json({ message: 'Answer not found' });
+
+    answer.markedForReview = true;
+    await answer.save();
+
+    res.json({ message: 'Answer marked for review', answer });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

@@ -12,6 +12,10 @@ const rtqService = {
   report: (id) => api.post(`/rtq/report/${id}`),
   convertToFAQ: (id) => api.post(`/rtq/convert/${id}`),
   updateStatus: (id, status) => api.patch(`/rtq/status/${id}`, { status }),
+  rejectAnswer: (answerId) => api.patch(`/rtq/reject-answer/${answerId}`),
+  rejectQuestion: (id) => api.patch(`/rtq/reject-question/${id}`),
+  reviewQuestion: (id) => api.patch(`/rtq/review-question/${id}`),
+  reviewAnswer: (answerId) => api.patch(`/rtq/review-answer/${answerId}`),
 };
 
 export default rtqService;

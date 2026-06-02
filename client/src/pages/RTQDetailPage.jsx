@@ -84,7 +84,76 @@ export default function RTQDetailPage() {
     }
   };
 
+  const handleStatusChange = async (newStatus) => {
+    try {
+      await rtqService.updateStatus(id, newStatus);
+      setRtq(prev => ({ ...prev, status: newStatus }));
+    } catch (err) {
+      alert(err.message || 'Failed to update status');
+    }
+  };
 
+  const isModeratorOrAbove = user && ['moderator', 'senior', 'admin'].includes(user.role);
+  const isSeniorOrAdmin = user && ['senior', 'admin'].includes(user.role);
+
+  const handleAcceptQuestion = async () => {
+    try {
+      await rtqService.markAccepted(id);
+      load();
+    } catch (err) {
+      alert(err.message || 'Failed to accept question');
+    }
+  };
+
+  const handleRejectQuestion = async () => {
+    if (!confirm('Are you sure you want to reject this question? A second rejection will permanently remove it.')) return;
+    try {
+      const res = await rtqService.rejectQuestion(id);
+      if (res.deleted) {
+        navigate('/rtq');
+      } else {
+        load();
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to reject question');
+    }
+  };
+
+  const handleReviewQuestion = async () => {
+    try {
+      await rtqService.reviewQuestion(id);
+      load();
+    } catch (err) {
+      alert(err.message || 'Failed to mark question for review');
+    }
+  };
+
+  const handleApproveAnswer = async (answerId) => {
+    try {
+      await rtqService.approveAnswer(answerId);
+      load();
+    } catch (err) {
+      alert(err.message || 'Failed to approve answer');
+    }
+  };
+
+  const handleRejectAnswer = async (answerId) => {
+    try {
+      await rtqService.rejectAnswer(answerId);
+      load();
+    } catch (err) {
+      alert(err.message || 'Failed to reject answer');
+    }
+  };
+
+  const handleReviewAnswer = async (answerId) => {
+    try {
+      await rtqService.reviewAnswer(answerId);
+      load();
+    } catch (err) {
+      alert(err.message || 'Failed to flag answer for review');
+    }
+  };
 
   if (loading) {
     return (
@@ -124,6 +193,12 @@ export default function RTQDetailPage() {
                   <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">Resolved</span>
                 </>
               )}
+              {rtq.markedForReview && isSeniorOrAdmin && (
+                <>
+                  <span>•</span>
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">⚠️ Flagged for Review</span>
+                </>
+              )}
             </div>
           </div>
           <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${
@@ -147,6 +222,40 @@ export default function RTQDetailPage() {
 
         {rtq.description && (
           <p className="text-sm text-muted mb-4">{rtq.description}</p>
+        )}
+
+        {isModeratorOrAbove && (
+          <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border">
+            {!rtq.isAccepted && rtq.status !== 'rejected' && (
+              <button
+                onClick={handleAcceptQuestion}
+                className="text-xs px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 font-semibold"
+              >
+                ✓ Accept Question
+              </button>
+            )}
+            {rtq.status !== 'rejected' && (
+              <button
+                onClick={handleRejectQuestion}
+                className="text-xs px-3 py-1.5 border border-red-200 text-red-500 rounded hover:bg-red-50 font-semibold"
+              >
+                ✗ Reject Question ({rtq.rejectedBy?.length || 0})
+              </button>
+            )}
+            {rtq.status === 'rejected' && (
+              <span className="text-xs px-3 py-1.5 bg-red-50 border border-red-200 text-red-700 rounded font-semibold">
+                ✗ Question Rejected ({rtq.rejectedBy?.length || 0}/2)
+              </span>
+            )}
+            {!rtq.markedForReview && (
+              <button
+                onClick={handleReviewQuestion}
+                className="text-xs px-3 py-1.5 border border-amber-200 text-amber-600 rounded hover:bg-amber-50 font-semibold"
+              >
+                ⚠️ Flag for Review
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -185,6 +294,46 @@ export default function RTQDetailPage() {
                 )}
                 <span className="text-xs text-muted">{timeAgo(ans.createdAt)}</span>
               </div>
+
+              {isModeratorOrAbove && (
+                <div className="flex gap-2 mt-3 pt-3 border-t border-border">
+                  <button
+                    onClick={() => handleApproveAnswer(ans._id)}
+                    disabled={ans.approvals?.includes(user?._id)}
+                    className={`text-xs px-2.5 py-1 rounded border font-semibold ${
+                      ans.approvals?.includes(user?._id)
+                        ? 'bg-green-50 text-green-700 border-green-200 cursor-not-allowed'
+                        : 'border-green-200 text-green-600 hover:bg-green-50'
+                    }`}
+                  >
+                    ✓ Approve ({ans.approvals?.length || (ans.isApproved ? 1 : 0)})
+                  </button>
+                  <button
+                    onClick={() => handleRejectAnswer(ans._id)}
+                    disabled={ans.rejections?.includes(user?._id)}
+                    className={`text-xs px-2.5 py-1 rounded border font-semibold ${
+                      ans.rejections?.includes(user?._id)
+                        ? 'bg-red-50 text-red-700 border-red-200 cursor-not-allowed'
+                        : 'border-red-200 text-red-600 hover:bg-red-50'
+                    }`}
+                  >
+                    ✗ Reject ({ans.rejections?.length || 0})
+                  </button>
+                  {!ans.markedForReview && (
+                    <button
+                      onClick={() => handleReviewAnswer(ans._id)}
+                      className="text-xs px-2.5 py-1 rounded border border-amber-200 text-amber-600 hover:bg-amber-50 font-semibold"
+                    >
+                      ⚠ Flag for Review
+                    </button>
+                  )}
+                  {ans.markedForReview && isSeniorOrAdmin && (
+                    <span className="text-xs px-2.5 py-1 rounded bg-amber-50 border border-amber-200 text-amber-700 font-semibold">
+                      ⚠ Flagged for Review
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           ))}
           {(!rtq.answers || rtq.answers.length === 0) && (
