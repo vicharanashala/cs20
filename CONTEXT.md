@@ -1,6 +1,6 @@
 # CONTEXT.md — PippaQ Project Context
 
-> Last updated: 2026-06-02 | Dashboard Role Badges, Multi-Moderator RTQ Moderation, Decision Transitions, FAQ Settings Menu, PippaQ branding, Senior Controlled FAQ Flow, Bidirectional Traceability, Senior Personal History
+> Last updated: 2026-06-02 | Dashboard Role Badges, Multi-Moderator RTQ Moderation, Decision Transitions, FAQ Settings Menu, PippaQ branding, Senior Controlled FAQ Flow, Bidirectional Traceability, Senior Personal History, cs20 Main Merge Conflict Resolution
 
 ---
 
@@ -213,6 +213,15 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
   - Upgraded the working history backend `listRTQs` to support `filter === 'history'`.
   - Queries `FAQ` entries created by the currently authenticated Senior (`req.user._id`) that originated from an RTQ (`rtqId` present) and lists only those original RTQs.
   - The `WorkingHistoryPage` now acts as a dedicated personal work history listing for the active Senior.
+
+### 13. Git Merge Resolution & Alignment
+* **Unified Moderation Gear Panel**:
+  - Integrated features from `origin/main` and unified the settings gear moderation actions in [RTQPage.jsx](file:///d:/FAQs/FAQ/client/src/pages/RTQPage.jsx) and [RTQDetailPage.jsx](file:///d:/FAQs/FAQ/client/src/pages/RTQDetailPage.jsx).
+  - Standard moderators see the "Request FAQ Conversion" button (`FileText` icon) under the gear.
+  - Seniors & Admins see ONLY the permanent remove (`Trash2` icon) button under the gear, keeping the controlled `Add to FAQ (Initiate)` review modal workflow triggered only from the card bottom/expanded views.
+  - Owners see the `Mark as Resolved` (`Check` icon) button.
+* **Vite CSS Import Warning Cleaned**:
+  - Reordered the font `@import` declaration in [index.css](file:///d:/FAQs/FAQ/client/src/index.css) to precede all `@tailwind` statements, ensuring a completely clean product build output with zero warnings or errors.
 
 ---
 
