@@ -1,6 +1,6 @@
 # CONTEXT.md — PippaQ Project Context
 
-> Last updated: 2026-06-02 | Dashboard Role Badges, Multi-Moderator RTQ Moderation, Decision Transitions, FAQ Settings Menu, PippaQ branding
+> Last updated: 2026-06-02 | Dashboard Role Badges, Multi-Moderator RTQ Moderation, Decision Transitions, FAQ Settings Menu, PippaQ branding, Senior Controlled FAQ Flow, Bidirectional Traceability, Senior Personal History
 
 ---
 
@@ -192,6 +192,27 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
 * **FAQ Page Moderator Actions (Settings Dropdown Menu)**:
   - Refactored `FAQPage.jsx` to render a small Lucide `Settings` gear icon button for moderator actions on any FAQ card, hidden completely from student users.
   - Clicking this gear opens a premium popover dropdown menu containing `Flag for Review` (if not reviewed yet), `Set on Trending` / `Remove Trending` (which toggles trending status via `PATCH /faq/toggle-trending/:id`), and senior's `Edit FAQ` and `Delete FAQ` actions.
+
+### 11. Controlled Senior "Add to FAQ" Workflow & Bidirectional Traceability
+* **Bidirectional Mapping**: 
+  - Added reference field `faqId` on the `RTQ` model and reference field `rtqId` on the `FAQ` model, guaranteeing 100% bi-directional traceability between original resolved questions and approved FAQ entries.
+* **Smart Frontend Auto-Selection**:
+  - Expanding an RTQ card executes a local 4-tier selection priority scheme to pre-select the best answer:
+    1. Senior's own answer (highest priority).
+    2. Senior-approved answer.
+    3. Moderator-approved answer.
+    4. Fallback to the highest upvoted answer.
+* **Review Edit Modal Panel**:
+  - Replaced immediate RTQ → FAQ conversion with a multi-step popup modal. When a Senior clicks `"Add to FAQ (Initiate)"`, it opens the panel pre-filled with the auto-selected answer, category, and tags.
+  - Seniors have full editorial control to modify the answer, choose a standardized category from a dropdown, and customize comma-separated tags before confirming.
+* **Traceable Creation Endpoint**:
+  - `convertToFAQ` controller parses custom body payloads (`answerId`, `answer`, `category`, `tags`), links documents, resolves original RTQ status to accepted, awards `+10 QP` to the Senior, awards `+10 QP` to the student answerer, and prevents duplicate conversions via `rtq.faqId` checks.
+
+### 12. Senior Personal Working History
+* **Personal Audit Trail**:
+  - Upgraded the working history backend `listRTQs` to support `filter === 'history'`.
+  - Queries `FAQ` entries created by the currently authenticated Senior (`req.user._id`) that originated from an RTQ (`rtqId` present) and lists only those original RTQs.
+  - The `WorkingHistoryPage` now acts as a dedicated personal work history listing for the active Senior.
 
 ---
 
