@@ -172,6 +172,8 @@ export async function addAnswer(req, res) {
       return res.status(400).json({ message: 'You have already answered this question' });
     }
 
+    const wasAlreadyResolved = rtq.status === 'resolved';
+
     const newAnswer = await Answer.create({
       questionId: rtq._id,
       userId: req.user._id,
@@ -179,15 +181,17 @@ export async function addAnswer(req, res) {
     });
 
     rtq.answers.push(newAnswer._id);
-    if (req.user.role === 'senior') {
+    if (!wasAlreadyResolved && (req.user.role === 'senior' || req.user.role === 'admin')) {
       rtq.status = 'resolved';
     }
     await rtq.save();
 
-    const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_ANSWER : QP_RULES.ANSWER_QUESTION;
-    await awardQP(req.user._id, qpAmount, 'Answered a question', newAnswer._id);
-    await notifyUser(req.user._id, req.user.role, 'answer_added',
-      `You answered a question. +${qpAmount} QP`, qpAmount, newAnswer._id);
+    if (!wasAlreadyResolved) {
+      const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? QP_RULES.SENIOR_ANSWER : QP_RULES.ANSWER_QUESTION;
+      await awardQP(req.user._id, qpAmount, 'Answered a question', newAnswer._id);
+      await notifyUser(req.user._id, req.user.role, 'answer_added',
+        `You answered a question. +${qpAmount} QP`, qpAmount, newAnswer._id);
+    }
 
     if (rtq.postedBy.toString() !== req.user._id.toString()) {
       await notifyUser(rtq.postedBy, 'student', 'new_answer',
@@ -242,12 +246,14 @@ export async function approveAnswer(req, res) {
       await rtq.save();
     }
 
-    const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_APPROVE_ANSWER;
-    await awardQP(req.user._id, qpAmount, `${req.user.role} approved an answer`, answer._id);
-    await awardQP(answer.userId, QP_RULES.ANSWER_APPROVED, 'Answer approved', answer._id);
+    if (rtq.status !== 'resolved') {
+      const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_APPROVE_ANSWER;
+      await awardQP(req.user._id, qpAmount, `${req.user.role} approved an answer`, answer._id);
+      await awardQP(answer.userId, QP_RULES.ANSWER_APPROVED, 'Answer approved', answer._id);
 
-    await notifyUser(answer.userId, 'student', 'answer_approved',
-      `Your answer was approved. +${QP_RULES.ANSWER_APPROVED} QP`, QP_RULES.ANSWER_APPROVED, answer._id);
+      await notifyUser(answer.userId, 'student', 'answer_approved',
+        `Your answer was approved. +${QP_RULES.ANSWER_APPROVED} QP`, QP_RULES.ANSWER_APPROVED, answer._id);
+    }
 
     res.json({ message: 'Answer approved', answer });
   } catch (err) {
@@ -261,13 +267,17 @@ export async function markAccepted(req, res) {
     const rtq = await RTQ.findById(req.params.id);
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
+    const wasAlreadyResolved = rtq.status === 'resolved';
+
     rtq.isAccepted = true;
     rtq.status = 'resolved';
     rtq.acceptedBy = req.user._id;
     await rtq.save();
 
-    const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_MARK_ACCEPTED;
-    await awardQP(req.user._id, qpAmount, `${req.user.role} accepted question`, rtq._id);
+    if (!wasAlreadyResolved) {
+      const qpAmount = req.user.role === 'senior' || req.user.role === 'admin' ? QP_RULES.SENIOR_APPROVE_ANSWER : QP_RULES.MODERATOR_MARK_ACCEPTED;
+      await awardQP(req.user._id, qpAmount, `${req.user.role} accepted question`, rtq._id);
+    }
 
     await notifyUser(rtq.postedBy, 'student', 'question_accepted',
       `Your question was accepted by a ${req.user.role}.`, 0, rtq._id);
