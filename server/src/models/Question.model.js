@@ -5,7 +5,7 @@ const questionSchema = new mongoose.Schema({
   question: { type: String, required: true },
   category: { type: String, required: true },
   tags: [{ type: String }],
-  status: { type: String, enum: ['unresolved', 'partial', 'resolved'], default: 'unresolved' },
+  status: { type: String, enum: ['unresolved', 'partially_resolved', 'resolved'], default: 'unresolved' },
   faqMatched: { type: Boolean, default: false },
   rtqMatched: { type: Boolean, default: false },
   answers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Answer' }],

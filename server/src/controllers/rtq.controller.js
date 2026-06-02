@@ -28,15 +28,19 @@ export async function listRTQs(req, res) {
       .lean();
 
     if (filter === 'unresolved') {
-      allRtqs = allRtqs.filter(r => r.status === 'open' && !r.isAccepted);
+      allRtqs = allRtqs.filter(r => ['unresolved', 'open'].includes(r.status) && !r.isAccepted);
     } else if (filter === 'resolved') {
       allRtqs = allRtqs.filter(r => r.status === 'resolved' || r.isAccepted);
     } else if (filter === 'partial') {
-      allRtqs = allRtqs.filter(r => r.answers?.length > 0 && !r.isAccepted);
+      allRtqs = allRtqs.filter(r => r.status === 'partially_resolved' || (r.answers?.length > 0 && !r.isAccepted));
     }
 
     if (category) {
-      allRtqs = allRtqs.filter(r => r.category === category);
+      let normalizedCategory = category.replace(/[\u2010-\u2015\u2212]/g, '-').replace(/\s*-\s*/g, ' - ');
+      const escapedCategory = normalizedCategory.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const categoryPattern = escapedCategory.replace('\\ -\\ ', '\\s*[\\u2010-\\u2015\\u2212\\-]\\s*');
+      const regex = new RegExp(`^(?:\\d+\\.\\s*)?${categoryPattern}$`, 'i');
+      allRtqs = allRtqs.filter(r => r.category && regex.test(r.category));
     }
 
     const total = allRtqs.length;
@@ -132,7 +136,7 @@ export async function submitQuestion(req, res) {
       tags: tags || [],
       postedBy: req.user._id,
       vectorEmbedding,
-      status: 'open',
+      status: 'unresolved',
       isAccepted: false
     });
 
@@ -175,6 +179,9 @@ export async function addAnswer(req, res) {
     });
 
     rtq.answers.push(newAnswer._id);
+    if (req.user.role === 'senior') {
+      rtq.status = 'resolved';
+    }
     await rtq.save();
 
     const qpAmount = req.user.role === 'senior' ? QP_RULES.SENIOR_ANSWER : QP_RULES.ANSWER_QUESTION;
@@ -378,6 +385,34 @@ export async function convertToFAQ(req, res) {
     }
 
     res.status(201).json({ message: 'Converted to FAQ', faq });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
+
+export async function updateRTQStatus(req, res) {
+  try {
+    const { status } = req.body;
+    if (!['unresolved', 'partially_resolved', 'resolved'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const rtq = await RTQ.findById(req.params.questionId);
+    if (!rtq) {
+      return res.status(404).json({ message: 'Question not found' });
+    }
+
+    // Only owner (question creator) can change status
+    if (rtq.postedBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Only the question owner can change the status' });
+    }
+
+    rtq.status = status;
+    rtq.updatedAt = new Date();
+    await rtq.save();
+
+    res.json({ message: 'Status updated successfully', rtq });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

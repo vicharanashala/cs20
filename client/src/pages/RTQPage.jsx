@@ -106,6 +106,8 @@ export default function RTQPage() {
     }
   };
 
+
+
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
@@ -115,7 +117,9 @@ export default function RTQPage() {
           <h1 className="text-2xl font-bold text-primary">Raise to Clarify (RTQ)</h1>
           <p className="text-muted text-sm mt-1">Questions pending clarification</p>
         </div>
-        <Link to="/raise-question" className="btn-primary">+ Ask a Question</Link>
+        {user && ['student', 'moderator'].includes(user.role) && (
+          <Link to="/raise-question" className="btn-primary">+ Ask a Question</Link>
+        )}
       </div>
 
       <div className="flex gap-3 mb-6">
@@ -147,10 +151,24 @@ export default function RTQPage() {
           <div className="space-y-4">
             {rtqs.map(rtq => {
               const isExpanded = expandedId === rtq._id;
+              const isOwner = user && (rtq.postedBy?._id || rtq.postedBy)?.toString() === user._id.toString();
               return (
-                <div key={rtq._id} className="card p-5">
+                <div key={rtq._id} className="card p-5 relative">
+                  {/* Status Indicator in Top-Right */}
+                  <div className="absolute top-5 right-5 z-10">
+                    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${
+                      rtq.status === 'resolved'
+                        ? 'bg-green-50 text-green-700 border-green-200'
+                        : rtq.status === 'partially_resolved'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : 'bg-red-50 text-red-700 border-red-200'
+                    }`}>
+                      {rtq.status === 'resolved' ? 'Resolved' : rtq.status === 'partially_resolved' ? 'Partially Resolved' : 'Unresolved'}
+                    </span>
+                  </div>
+
                   <div className="flex gap-4">
-                    <div className="flex-1">
+                    <div className="flex-1 pr-28">
                       <div className="flex items-start gap-2 mb-1">
                         <Link to={`/rtq/${rtq._id}`} className="font-semibold text-primary hover:underline">{rtq.question}</Link>
                         {rtq.isAccepted && (

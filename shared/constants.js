@@ -56,13 +56,14 @@ export const RAG_THRESHOLDS = {
 };
 
 export const FAQ_CATEGORIES = [
-  'Admissions',
-  'Academics',
-  'Placements',
-  'Campus Life',
-  'Fees & Scholarships',
-  'Examinations',
-  'Hostel & Facilities',
-  'Clubs & Activities',
+  'About the internship',
+  'Timing and dates',
+  'NOC (No Objection Certificate)',
+  'Selection, offer letter, and certificate',
+  'Work, mentorship, and projects',
+  'Code of conduct - communication channels',
+  'Interviews Related',
+  'Certificate',
+  'Rosetta - your internship journal',
   'General'
 ];

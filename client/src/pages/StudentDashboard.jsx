@@ -46,7 +46,6 @@ export default function StudentDashboard() {
     { to: '/rtq', label: 'RTQ Board', desc: 'Clarify doubts with the community', color: 'bg-purple-50 border-purple-200' },
     { to: '/raise-question', label: 'Ask a Question', desc: 'Submit a question for review', color: 'bg-orange-50 border-orange-200' },
     { to: '/track', label: 'Track Questions', desc: 'Monitor your raised questions', color: 'bg-green-50 border-green-200' },
-    { to: '/notifications', label: 'Notifications', desc: `${stats.unreadCount} unread`, color: 'bg-yellow-50 border-yellow-200' },
     { to: '/profile', label: 'My Profile', desc: 'View QP history and stats', color: 'bg-slate-50 border-slate-200' },
   ];
 
@@ -68,7 +67,7 @@ export default function StudentDashboard() {
             {[1,2,3].map(i => <div key={i} className="h-20 bg-white animate-pulse rounded-lg" />)}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {[1,2,3,4,5,6].map(i => <div key={i} className="h-24 bg-white animate-pulse rounded-lg" />)}
+            {[1,2,3,4,5].map(i => <div key={i} className="h-24 bg-white animate-pulse rounded-lg" />)}
           </div>
         </div>
       ) : (

@@ -74,7 +74,6 @@ export default function SeniorDashboard() {
     { to: '/faq', label: 'Manage FAQs', desc: 'Add, edit or remove FAQs', color: 'bg-blue-50 border-blue-200' },
     { to: '/users', label: 'User Management', desc: 'View and manage users', color: 'bg-purple-50 border-purple-200' },
     { to: '/history', label: 'Working History', desc: 'View all RTQ activities', color: 'bg-green-50 border-green-200' },
-    { to: '/notifications', label: 'Notifications', desc: `${unreadCount} unread`, color: 'bg-yellow-50 border-yellow-200' },
   ];
 
   return (
@@ -87,8 +86,8 @@ export default function SeniorDashboard() {
               <div className="h-4 w-64 bg-slate-100 animate-pulse rounded" />
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[1,2,3,4].map(i => <div key={i} className="h-24 bg-white animate-pulse rounded-lg" />)}
+          <div className="grid grid-cols-3 gap-4">
+            {[1,2,3].map(i => <div key={i} className="h-24 bg-white animate-pulse rounded-lg" />)}
           </div>
           <div className="grid grid-cols-3 gap-4">
             {[1,2,3].map(i => <div key={i} className="h-20 bg-white animate-pulse rounded-lg" />)}
@@ -129,7 +128,7 @@ export default function SeniorDashboard() {
       )}
 
       {/* Quick links */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-3 gap-4 mb-8">
         {quickLinks.map(link => (
           <Link key={link.to} to={link.to} className={`card p-5 border-2 hover:border-primary transition-colors ${link.color}`}>
             <div className="font-semibold text-primary">{link.label}</div>

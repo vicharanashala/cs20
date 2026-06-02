@@ -25,11 +25,11 @@ export default function SignupPage() {
       setUserId(res.userId);
       setStep(2);
     } catch (err) {
-      if (err.response?.data?.restricted) {
+      if (err.restricted || err.response?.data?.restricted) {
         setRestricted(true);
-        setError('Access Restricted. This email is not on the accepted list.');
+        setError(err.message || err.response?.data?.message || 'Access Restricted. This email is not on the accepted list.');
       } else {
-        setError(err.response?.data?.message || err.message || 'Signup failed');
+        setError(err.message || err.response?.data?.message || 'Signup failed');
       }
     } finally {
       setLoading(false);
@@ -44,7 +44,7 @@ export default function SignupPage() {
       await requestAccess(form);
       setAccessRequested(true);
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to submit request');
+      setError(err.message || err.error || err.response?.data?.message || err.response?.data?.error || 'Failed to submit request');
     } finally {
       setLoading(false);
     }
