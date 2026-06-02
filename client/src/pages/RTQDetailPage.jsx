@@ -6,7 +6,8 @@ import { useQP } from '../context/QPContext';
 import { timeAgo } from '../utils/helpers';
 import UpvoteButton from '../components/UpvoteButton';
 import { Spinner } from '../components/SkeletonLoader';
-import { Settings, Check, X, Flag } from 'lucide-react';
+import { Settings, Check, X, Flag, Trash2, BookOpen } from 'lucide-react';
+import { FAQ_CATEGORIES } from '../utils/constants';
 
 export default function RTQDetailPage() {
   const { id } = useParams();
@@ -19,6 +20,15 @@ export default function RTQDetailPage() {
   const [answerLoading, setAnswerLoading] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState(false);
   const [selectedAnswerId, setSelectedAnswerId] = useState(null);
+  const [showFaqModal, setShowFaqModal] = useState(false);
+  const [submittingFaq, setSubmittingFaq] = useState(false);
+  const [faqModalData, setFaqModalData] = useState({
+    rtqId: '',
+    answerId: '',
+    answer: '',
+    category: '',
+    tags: ''
+  });
 
   const load = async () => {
     setLoading(true);
@@ -128,6 +138,74 @@ export default function RTQDetailPage() {
       load();
     } catch (err) {
       alert(err.message || 'Failed to mark question for review');
+    }
+  };
+
+  const handleRemoveQuestion = async () => {
+    if (!confirm('Are you sure you want to permanently delete/remove this question? This will penalize the author -5 QP.')) return;
+    try {
+      await rtqService.remove(id);
+      navigate('/rtq');
+    } catch (err) {
+      alert(err.message || 'Failed to remove question');
+    }
+  };
+
+  const handleInitiateFAQ = () => {
+    const answers = [...(rtq.answers || [])].sort((a, b) => b.upvotes - a.upvotes);
+    let selectedAns = null;
+
+    // 1. Senior's own answer (written by the converting Senior/Admin)
+    selectedAns = answers.find(ans => 
+      (ans.userId?._id || ans.userId)?.toString() === user?._id?.toString()
+    );
+
+    // 2. Senior-approved answer (approved by any senior or admin)
+    if (!selectedAns) {
+      selectedAns = answers.find(ans => 
+        ans.approvals?.some(u => u.role === 'senior' || u.role === 'admin')
+      );
+    }
+
+    // 3. Moderator-approved answer (approved by any moderator)
+    if (!selectedAns) {
+      selectedAns = answers.find(ans => 
+        ans.approvals?.some(u => u.role === 'moderator')
+      );
+    }
+
+    // 4. Otherwise → most upvoted answer
+    if (!selectedAns && answers.length > 0) {
+      selectedAns = answers[0];
+    }
+
+    setFaqModalData({
+      rtqId: rtq._id,
+      answerId: selectedAns ? selectedAns._id : '',
+      answer: selectedAns ? selectedAns.answer : '',
+      category: rtq.category || '',
+      tags: rtq.tags ? rtq.tags.join(', ') : ''
+    });
+    setShowFaqModal(true);
+  };
+
+  const handleConfirmFaq = async () => {
+    if (!faqModalData.answer?.trim() || !faqModalData.category) return;
+    setSubmittingFaq(true);
+    try {
+      await rtqService.convertToFAQ(faqModalData.rtqId, {
+        answerId: faqModalData.answerId,
+        answer: faqModalData.answer,
+        category: faqModalData.category,
+        tags: faqModalData.tags
+      });
+      setShowFaqModal(false);
+      load();
+      refreshQP?.();
+    } catch (err) {
+      alert(err.message || 'Failed to convert RTQ to FAQ');
+    } finally {
+      setSubmittingFaq(false);
     }
   };
 
@@ -285,6 +363,15 @@ export default function RTQDetailPage() {
                     <Flag className="w-4 h-4" />
                   </button>
                 )}
+                {isSeniorOrAdmin && (
+                  <button
+                    onClick={handleRemoveQuestion}
+                    className="p-1.5 border border-red-200 text-red-500 rounded hover:bg-red-50 transition-colors"
+                    title="Remove Question Permanently"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -399,6 +486,18 @@ export default function RTQDetailPage() {
         </div>
       </div>
 
+      {isSeniorOrAdmin && !rtq.faqId && (
+        <div className="card p-5 mb-6 flex justify-end">
+          <button
+            onClick={handleInitiateFAQ}
+            className="btn-secondary flex items-center gap-2 hover:border-blue-300 hover:text-blue-600 transition-colors text-xs font-semibold px-4 py-2"
+            title="Add this resolved question and its best answer to the approved FAQ knowledge base"
+          >
+            <BookOpen className="w-4 h-4" /> Add to FAQ (Initiate)
+          </button>
+        </div>
+      )}
+
       {/* Answer Form */}
       {user && (
         <div className="card p-5">
@@ -417,6 +516,81 @@ export default function RTQDetailPage() {
           >
             {answerLoading ? <Spinner size="sm" /> : 'Submit Answer'}
           </button>
+        </div>
+      )}
+      {showFaqModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-300">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 border border-slate-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-primary mb-2 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-blue-600" /> Controlled FAQ Review Panel
+            </h3>
+            <p className="text-xs text-muted mb-4">
+              Refine and review the selected answer, category, and tags before publishing to the Approved FAQ knowledge base.
+            </p>
+
+            <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+              <div>
+                <label className="block text-xs font-semibold text-primary mb-1 uppercase tracking-wider">
+                  Answer Content
+                </label>
+                <textarea
+                  value={faqModalData.answer}
+                  onChange={e => setFaqModalData(prev => ({ ...prev, answer: e.target.value }))}
+                  className="input w-full resize-none font-sans text-sm leading-relaxed"
+                  rows={6}
+                  placeholder="Review and polish the answer content..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-primary mb-1 uppercase tracking-wider">
+                    Category
+                  </label>
+                  <select
+                    value={faqModalData.category}
+                    onChange={e => setFaqModalData(prev => ({ ...prev, category: e.target.value }))}
+                    className="input w-full text-sm"
+                  >
+                    <option value="">Select Category</option>
+                    {FAQ_CATEGORIES.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-primary mb-1 uppercase tracking-wider">
+                    Tags (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={faqModalData.tags}
+                    onChange={e => setFaqModalData(prev => ({ ...prev, tags: e.target.value }))}
+                    className="input w-full text-sm"
+                    placeholder="tag1, tag2, tag3"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-border">
+              <button
+                onClick={() => setShowFaqModal(false)}
+                className="btn-secondary text-sm px-4 py-2"
+                disabled={submittingFaq}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmFaq}
+                className="btn-primary text-sm px-4 py-2 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={submittingFaq || !faqModalData.answer?.trim() || !faqModalData.category}
+              >
+                {submittingFaq ? <Spinner size="sm" /> : 'Confirm Add to FAQ'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

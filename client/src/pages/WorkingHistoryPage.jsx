@@ -13,11 +13,10 @@ export default function WorkingHistoryPage() {
   const [rtqs, setRtqs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ FIX #10: wrap load in useCallback
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await rtqService.list({ sort: 'createdAt' });
+      const data = await rtqService.list({ sort: 'createdAt', filter: 'history' });
       setRtqs(Array.isArray(data) ? data : data.data || []);
     } catch (err) {
       console.error(err);
@@ -125,12 +124,6 @@ export default function WorkingHistoryPage() {
                         Accept
                       </button>
                     )}
-                    <button
-                      onClick={() => handleConvertToFAQ(rtq._id)}
-                      className="text-xs px-3 py-1.5 border border-blue-200 rounded text-blue-700 hover:bg-blue-50"
-                    >
-                      → FAQ
-                    </button>
                     <button
                       onClick={() => handleRemove(rtq._id)}
                       className="text-xs px-3 py-1.5 border border-red-200 rounded text-red-500 hover:bg-red-50"
