@@ -84,6 +84,8 @@ export default function RTQDetailPage() {
     }
   };
 
+
+
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-6 flex items-center justify-center min-h-[50vh]">
@@ -93,6 +95,8 @@ export default function RTQDetailPage() {
   }
 
   if (!rtq) return null;
+
+  const isOwner = user && (rtq.postedBy?._id || rtq.postedBy)?.toString() === user._id.toString();
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
@@ -122,10 +126,14 @@ export default function RTQDetailPage() {
               )}
             </div>
           </div>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-            rtq.status === 'open' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+          <span className={`px-2.5 py-1 text-xs font-semibold rounded-full border ${
+            rtq.status === 'resolved'
+              ? 'bg-green-50 text-green-700 border-green-200'
+              : rtq.status === 'partially_resolved'
+              ? 'bg-amber-50 text-amber-700 border-amber-200'
+              : 'bg-red-50 text-red-700 border-red-200'
           }`}>
-            {rtq.status}
+            {rtq.status === 'resolved' ? 'Resolved' : rtq.status === 'partially_resolved' ? 'Partially Resolved' : 'Unresolved'}
           </span>
         </div>
 

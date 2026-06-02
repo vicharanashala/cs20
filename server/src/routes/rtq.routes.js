@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import {
   listRTQs, getRTQ, submitQuestion, addAnswer, upvoteAnswer,
-  approveAnswer, markAccepted, removeRTQ, reportRTQ, convertToFAQ
+  approveAnswer, markAccepted, removeRTQ, reportRTQ, convertToFAQ,
+  updateRTQStatus
 } from '../controllers/rtq.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { authorizeRoles } from '../middleware/role.middleware.js';
@@ -17,6 +18,7 @@ router.patch('/approve-answer/:answerId', authenticate, authorizeRoles('moderato
 router.patch('/mark-accepted/:id', authenticate, authorizeRoles('moderator', 'senior', 'admin'), markAccepted);
 router.post('/convert/:id', authenticate, authorizeRoles('senior', 'admin'), convertToFAQ);
 router.post('/report/:id', authenticate, reportRTQ);
+router.patch('/status/:questionId', authenticate, updateRTQStatus);
 
 // Dynamic /:id routes last
 router.get('/:id', authenticate, getRTQ);

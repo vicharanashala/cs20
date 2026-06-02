@@ -19,7 +19,8 @@ export default function TrackQuestionPage() {
         questionService.getUserQuestions(user._id),
         rtqService.list()
       ]);
-      const myRtqs = Array.isArray(r) ? r.filter(rtq => rtq.postedBy?._id === user._id || rtq.postedBy === user._id) : (r.data || []);
+      const rawRtqs = Array.isArray(r) ? r : (r.data || []);
+      const myRtqs = rawRtqs.filter(rtq => (rtq.postedBy?._id || rtq.postedBy)?.toString() === user._id.toString());
       setQuestions(Array.isArray(q) ? q : []);
       setRtqs(myRtqs);
     } catch (err) {
@@ -43,6 +44,17 @@ export default function TrackQuestionPage() {
     }
   };
 
+  const handleRTQStatusUpdate = async (rtqId, status) => {
+    const prev = rtqs;
+    setRtqs(prev => prev.map(r => r._id === rtqId ? { ...r, status } : r));
+    try {
+      await rtqService.updateStatus(rtqId, status);
+    } catch (err) {
+      setRtqs(prev);
+      alert(err.message || 'Failed to update status');
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       <Breadcrumb items={[{ label: 'Track Questions' }]} />
@@ -63,15 +75,25 @@ export default function TrackQuestionPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <p className="font-medium text-primary">{rtq.question}</p>
-                        <div className="flex items-center gap-2 mt-2 text-xs text-muted">
-                          <span className={`px-2 py-0.5 rounded-full ${rtq.status === 'open' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
-                            {rtq.status}
-                          </span>
-                          <span>{rtq.category}</span>
-                          <span>•</span>
-                          <span>{rtq.answers?.length || 0} answers</span>
-                          <span>•</span>
-                          <span>{timeAgo(rtq.createdAt)}</span>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className="text-xs text-muted">{rtq.category}</span>
+                          <span className="text-xs text-muted">{timeAgo(rtq.createdAt)}</span>
+                          <span className="text-xs text-muted">• {rtq.answers?.length || 0} answers</span>
+                          <select
+                            value={rtq.status || 'unresolved'}
+                            onChange={e => handleRTQStatusUpdate(rtq._id, e.target.value)}
+                            className={`text-xs font-semibold px-2 py-0.5 rounded-md border shadow-sm cursor-pointer focus:outline-none focus:ring-2 ${
+                              rtq.status === 'resolved'
+                                ? 'bg-green-50 text-green-700 border-green-200 focus:ring-green-400'
+                                : rtq.status === 'partially_resolved'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-400'
+                                : 'bg-red-50 text-red-700 border-red-200 focus:ring-red-400'
+                            }`}
+                          >
+                            <option value="unresolved">Unresolved</option>
+                            <option value="partially_resolved">Partially Resolved</option>
+                            <option value="resolved">Resolved</option>
+                          </select>
                         </div>
                         {rtq.isAccepted && (
                           <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
