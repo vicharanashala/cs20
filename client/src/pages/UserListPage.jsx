@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import userService from '../services/user.service';
 import adminService from '../services/admin.service';
-import faqService from '../services/faq.service';
 import { useAuth } from '../context/AuthContext';
 import QPBadge from '../components/QPBadge';
 import { RoleBadge } from '../components/Badge';
@@ -17,6 +16,7 @@ export default function UserListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [activeListTab, setActiveListTab] = useState('peers');
 
   const [whitelist, setWhitelist] = useState([]);
   const [wlLoading, setWlLoading] = useState(false);
@@ -27,16 +27,12 @@ export default function UserListPage() {
   const [arLoading, setArLoading] = useState(false);
   const [rejectNote, setRejectNote] = useState({});
 
-  const [faqConversionRequests, setFaqConversionRequests] = useState([]);
-  const [fcrLoading, setFcrLoading] = useState(false);
-
   const isAdmin = user?.role === 'admin';
   const isSenior = user?.role === 'senior';
 
   useEffect(() => { loadUsers(); }, [roleFilter]);
   useEffect(() => { if (isAdmin && tab === 'whitelist') loadWhitelist(); }, [tab, isAdmin]);
   useEffect(() => { if (isAdmin && tab === 'requests') loadAccessRequests(); }, [tab, isAdmin]);
-  useEffect(() => { if (isAdmin && tab === 'faq-requests') loadFaqConversionRequests(); }, [tab, isAdmin]);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -71,18 +67,6 @@ export default function UserListPage() {
       console.error(err);
     } finally {
       setArLoading(false);
-    }
-  };
-
-  const loadFaqConversionRequests = async () => {
-    setFcrLoading(true);
-    try {
-      const data = await faqService.listConversionRequests();
-      setFaqConversionRequests(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setFcrLoading(false);
     }
   };
 
@@ -180,25 +164,6 @@ const handleRestrict = async (userId) => {
     }
   };
 
-  const handleApproveFaqConversion = async (requestId) => {
-    if (!confirm('Approve this FAQ conversion? The FAQ will be created.')) return;
-    try {
-      await faqService.approveConversionRequest(requestId);
-      loadFaqConversionRequests();
-    } catch (err) {
-      alert(err.message || 'Failed to approve conversion request');
-    }
-  };
-
-  const handleRejectFaqConversion = async (requestId, adminNote) => {
-    try {
-      await faqService.rejectConversionRequest(requestId, adminNote);
-      loadFaqConversionRequests();
-    } catch (err) {
-      alert(err.message || 'Failed to reject conversion request');
-    }
-  };
-
   const filtered = users.filter(u =>
     !search ||
     u.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -206,8 +171,118 @@ const handleRestrict = async (userId) => {
     u.email?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const canSeeSeniorsAndAdmins = isSenior || isAdmin;
+
+  const studentModerators = filtered.filter(u => u.role === 'student' || u.role === 'moderator');
+  const seniorAdmins = filtered.filter(u => u.role === 'senior' || u.role === 'admin');
+
+  const renderUserList = (listToRender, title) => {
+    return (
+      <div className="flex-1 min-w-0">
+        {canSeeSeniorsAndAdmins && (
+          <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+            <h2 className="text-lg font-bold text-primary">{title}</h2>
+            <span className="text-xs font-semibold px-2 py-0.5 bg-slate-100 text-muted rounded-full">
+              {listToRender.length} {listToRender.length === 1 ? 'user' : 'users'}
+            </span>
+          </div>
+        )}
+        {listToRender.length === 0 ? (
+          <div className="text-center py-8 text-muted border border-dashed border-border rounded-2xl bg-white">
+            No users found in this list
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {listToRender.map((u, idx) => {
+              const rank = idx + 1;
+              const isTop3 = rank <= 3;
+              const isCurrentUser = u._id === user._id;
+              const rankIcon = rank === 1 ? <Crown className="w-5 h-5 text-amber-500" /> : rank === 2 ? <Trophy className="w-5 h-5 text-slate-400" /> : rank === 3 ? <Trophy className="w-5 h-5 text-orange-400" /> : null;
+
+              return (
+                <div
+                  key={u._id}
+                  className={`card-padded flex items-center gap-4 ${
+                    isCurrentUser ? 'ring-2 ring-primary/20 bg-primary/[0.02]' : ''
+                  } ${isTop3 ? 'border-2' : 'border'}`}
+                  style={isTop3 ? {
+                    borderColor: rank === 1 ? '#fbbf24' : rank === 2 ? '#cbd5e1' : rank === 3 ? '#fb923c' : undefined,
+                  } : undefined}
+                >
+                  <div className="w-8 text-center shrink-0">
+                    {rankIcon || <span className="text-sm font-semibold text-muted">{rank}</span>}
+                  </div>
+                  <Link to={`/users/${u._id}`} className="flex-1 min-w-0 hover:opacity-80 transition-opacity">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold truncate text-primary">{u.name}</p>
+                      {isCurrentUser && <span className="text-xs text-muted">(you)</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-muted">@{u.username}</span>
+                      <span className="text-muted">&middot;</span>
+                      <RoleBadge role={u.role} />
+                    </div>
+                  </Link>
+                  <div className="text-right shrink-0">
+                    {u.status === 'blocked' && (
+                      <span className="inline-block text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded mb-1">Blocked</span>
+                    )}
+                    <QPBadge qp={u.qp || 0} />
+                    <p className="text-xs text-muted mt-0.5">joined {timeAgo(u.createdAt)}</p>
+                  </div>
+                  {(isSenior || isAdmin) && (
+                    <div className="flex gap-1.5 shrink-0">
+                      {isAdmin && (
+                        <select
+                          value={u.role}
+                          onChange={e => handleAssignRole(u._id, e.target.value)}
+                          className="input-sm text-xs"
+                        >
+                          <option value="student">Student</option>
+                          <option value="moderator">Moderator</option>
+                          <option value="senior">Senior</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      )}
+                      <button
+                        onClick={() => handleRestrict(u._id)}
+                        className={`btn-ghost-sm ${u.restrictedAt ? 'text-red-500' : ''}`}
+                        title={u.restrictedAt ? 'Unrestrict' : 'Restrict'}
+                      >
+                        {u.restrictedAt ? 'Unrestrict' : 'Restrict'}
+                      </button>
+                      {isAdmin && (
+                        u.status === 'blocked' ? (
+                          <button
+                            onClick={() => handleUnblock(u._id)}
+                            className="btn-ghost-sm text-green-600"
+                            title="Unblock"
+                          >
+                            Unblock
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleBlock(u._id)}
+                            className="btn-ghost-sm text-red-500"
+                            title="Block"
+                          >
+                            Block
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-<div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-4xl mx-auto px-4 py-6">
       <Breadcrumb items={[{ label: 'Leaderboard' }]} />
       <div className="flex items-center justify-between mb-6">
         <h1 className="page-title">Leaderboard</h1>
@@ -229,14 +304,6 @@ const handleRestrict = async (userId) => {
             >
               Access Requests
             </button>
-            <button
-              onClick={() => setTab('faq-requests')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                tab === 'faq-requests' ? 'bg-primary text-white' : 'bg-slate-100 text-muted hover:bg-slate-200'
-              }`}
-            >
-              FAQ Requests
-            </button>
           </div>
         )}
       </div>
@@ -255,7 +322,7 @@ const handleRestrict = async (userId) => {
               <option value="">All Roles</option>
               <option value="student">Student</option>
               <option value="moderator">Moderator</option>
-              <option value="senior">Senior</option>
+              {canSeeSeniorsAndAdmins && <option value="senior">Senior</option>}
               {isAdmin && <option value="admin">Admin</option>}
             </select>
           </div>
@@ -265,89 +332,36 @@ const handleRestrict = async (userId) => {
           ) : filtered.length === 0 ? (
             <div className="text-center py-12 text-muted">No users found</div>
           ) : (
-            <div className="space-y-2">
-              {filtered.map((u) => {
-                const rank = filtered.indexOf(u) + 1;
-                const isTop3 = rank <= 3;
-                const isCurrentUser = u._id === user._id;
-                const rankIcon = rank === 1 ? <Crown className="w-5 h-5 text-amber-500" /> : rank === 2 ? <Trophy className="w-5 h-5 text-slate-400" /> : rank === 3 ? <Trophy className="w-5 h-5 text-orange-400" /> : null;
-
-                return (
-                  <div
-                    key={u._id}
-                    className={`card-padded flex items-center gap-4 ${
-                      isCurrentUser ? 'ring-2 ring-primary/20 bg-primary/[0.02]' : ''
-                    } ${isTop3 ? 'border-2' : 'border'}`}
-                    style={isTop3 ? {
-                      borderColor: rank === 1 ? '#fbbf24' : rank === 2 ? '#cbd5e1' : rank === 3 ? '#fb923c' : undefined,
-                    } : undefined}
+            <div className="space-y-6">
+              {canSeeSeniorsAndAdmins && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveListTab('peers')}
+                    className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors border ${
+                      activeListTab === 'peers'
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-muted border-border hover:bg-slate-50'
+                    }`}
                   >
-                    <div className="w-8 text-center shrink-0">
-                      {rankIcon || <span className="text-sm font-semibold text-muted">{rank}</span>}
-                    </div>
-                    <Link to={`/users/${u._id}`} className="flex-1 min-w-0 hover:opacity-80 transition-opacity">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold truncate text-primary">{u.name}</p>
-                        {isCurrentUser && <span className="text-xs text-muted">(you)</span>}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-muted">@{u.username}</span>
-                        <span className="text-muted">&middot;</span>
-                        <RoleBadge role={u.role} />
-                      </div>
-                    </Link>
-                    <div className="text-right shrink-0">
-                      {u.status === 'blocked' && (
-                        <span className="inline-block text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded mb-1">Blocked</span>
-                      )}
-                      <QPBadge qp={u.qp || 0} />
-                      <p className="text-xs text-muted mt-0.5">joined {timeAgo(u.createdAt)}</p>
-                    </div>
-                    {(isSenior || isAdmin) && (
-                      <div className="flex gap-1.5 shrink-0">
-                        {isAdmin && (
-                          <select
-                            value={u.role}
-                            onChange={e => handleAssignRole(u._id, e.target.value)}
-                            className="input-sm text-xs"
-                          >
-                            <option value="student">Student</option>
-                            <option value="moderator">Moderator</option>
-                            <option value="senior">Senior</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        )}
-                        <button
-                          onClick={() => handleRestrict(u._id)}
-                          className={`btn-ghost-sm ${u.restrictedAt ? 'text-red-500' : ''}`}
-                          title={u.restrictedAt ? 'Unrestrict' : 'Restrict'}
-                        >
-                          {u.restrictedAt ? 'Unrestrict' : 'Restrict'}
-                        </button>
-                        {isAdmin && (
-                          u.status === 'blocked' ? (
-                            <button
-                              onClick={() => handleUnblock(u._id)}
-                              className="btn-ghost-sm text-green-600"
-                              title="Unblock"
-                            >
-                              Unblock
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleBlock(u._id)}
-                              className="btn-ghost-sm text-red-500"
-                              title="Block"
-                            >
-                              Block
-                            </button>
-                          )
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                    Peers ({studentModerators.length})
+                  </button>
+                  <button
+                    onClick={() => setActiveListTab('seniors')}
+                    className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors border ${
+                      activeListTab === 'seniors'
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-muted border-border hover:bg-slate-50'
+                    }`}
+                  >
+                    Seniors ({seniorAdmins.length})
+                  </button>
+                </div>
+              )}
+
+              <div>
+                {(!canSeeSeniorsAndAdmins || activeListTab === 'peers') && renderUserList(studentModerators, "Peers")}
+                {canSeeSeniorsAndAdmins && activeListTab === 'seniors' && renderUserList(seniorAdmins, "Seniors")}
+              </div>
             </div>
           )}
         </>
@@ -464,70 +478,6 @@ const handleRestrict = async (userId) => {
         </div>
       )}
 
-      {tab === 'faq-requests' && isAdmin && (
-        <div className="space-y-6">
-          {fcrLoading ? (
-            <div className="text-center py-12 text-muted">Loading...</div>
-          ) : faqConversionRequests.length === 0 ? (
-            <div className="card p-8 text-center text-muted">No FAQ conversion requests.</div>
-          ) : (
-            faqConversionRequests.map(req => (
-              <div key={req._id} className="card p-6 space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                        req.status === 'pending' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                        req.status === 'approved' ? 'bg-green-50 text-green-700 border border-green-200' :
-                        'bg-red-50 text-red-700 border border-red-200'
-                      }`}>
-                        {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                      </span>
-                      <span className="text-xs text-muted">by {req.requestedBy?.name || 'Unknown'}</span>
-                      <span className="text-xs text-muted">· {timeAgo(req.requestedAt)}</span>
-                    </div>
-                    <div className="font-medium text-primary text-sm mb-1">{req.rtqQuestion}</div>
-                    {req.rtqAnswer && (
-                      <div className="text-xs text-muted mb-1">
-                        <span className="font-medium">Top Answer:</span> {req.rtqAnswer.substring(0, 100)}...
-                      </div>
-                    )}
-                    {req.suggestedAnswer && (
-                      <div className="text-xs text-blue-600">
-                        <span className="font-medium">Suggested Answer:</span> {req.suggestedAnswer.substring(0, 100)}...
-                      </div>
-                    )}
-                    {req.adminNote && (
-                      <div className="text-xs text-muted mt-1 italic">Note: {req.adminNote}</div>
-                    )}
-                  </div>
-                  {req.status === 'pending' && (
-                    <div className="flex gap-2 ml-4">
-                      <button
-                        onClick={() => handleApproveFaqConversion(req._id)}
-                        className="p-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                        title="Approve"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const note = prompt('Rejection note (optional):');
-                          handleRejectFaqConversion(req._id, note);
-                        }}
-                        className="p-1.5 border border-red-200 text-red-500 rounded hover:bg-red-50 transition-colors"
-                        title="Reject"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import rtqService from '../services/rtq.service';
+import faqService from '../services/faq.service';
 import { useAuth } from '../context/AuthContext';
 import { useQP } from '../context/QPContext';
 import { timeAgo } from '../utils/helpers';
@@ -165,7 +166,7 @@ export default function RTQPage() {
     const suggested = prompt('Optionally enter a suggested answer (or leave blank to use the top-voted answer):');
     if (suggested === null) return;
     try {
-      await rtqService.requestConversion(rtqId, suggested || undefined);
+      await faqService.requestConversion(rtqId, suggested || undefined);
       alert('FAQ conversion request submitted to admin for review.');
     } catch (err) {
       alert(err.message || 'Failed to submit conversion request');

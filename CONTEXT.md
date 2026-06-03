@@ -1,6 +1,6 @@
 # CONTEXT.md — PippaQ Project Context
 
-> Last updated: 2026-06-02 | Dashboard Role Badges, Multi-Moderator RTQ Moderation, Decision Transitions, FAQ Settings Menu, PippaQ branding, Senior Controlled FAQ Flow, Bidirectional Traceability, Senior Personal History, cs20 Main Merge Conflict Resolution
+> Last updated: 2026-06-03 | Leaderboard Layout Toggles, FAQ Requests Relocation to FAQ page, Qdrant Sync for FAQ requests, requestedAt timestamping, Client TypeErrors Fixed
 
 ---
 
@@ -222,6 +222,18 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
   - Owners see the `Mark as Resolved` (`Check` icon) button.
 * **Vite CSS Import Warning Cleaned**:
   - Reordered the font `@import` declaration in [index.css](file:///d:/FAQs/FAQ/client/src/index.css) to precede all `@tailwind` statements, ensuring a completely clean product build output with zero warnings or errors.
+
+### 14. Leaderboard Segmented Toggle & Tier Renames
+* **Peers & Seniors Separation:** Partitioned the user lists on the Leaderboard page (`UserListPage.jsx`) into **Peers** (Student/Moderator) and **Seniors** (Senior/Admin).
+* **Segmented Toggle Group:** Added a modern tab-like button switcher group at the top of the user list. Privilege-holders (Seniors/Admins) can toggle between the "Peers" list and "Seniors" list. Non-privileged users (Students/Moderators) only see the "Peers" list.
+* **Independent Ranking Tracks:** Refactored rankings so each tier runs its own leaderboard starting at rank #1, awarding Crown and Trophy badges to top performers in both groups.
+
+### 15. FAQ Conversion Requests Fixes & FAQ Page Relocation
+* **Client Service Alignment:** Fixed TypeError crashes in `RTQPage.jsx` and `RTQDetailPage.jsx` by updating legacy `rtqService.requestConversion` calls to `faqService.requestConversion`.
+* **Section Relocation:** Shifted the FAQ conversion request review list from the Users page to a collapsible dashboard at the top of the main `FAQPage.jsx` view.
+* **Role Expansion:** Updated backend routing (`faq.routes.js`) to grant permissions to the `'senior'` role for listing, approving, and rejecting FAQ requests, in addition to `'admin'`.
+* **Database Schema Field:** Added the missing `requestedAt` field to `FAQConversionRequest.model.js` to enable creation timestamping and sorting.
+* **Qdrant Vector indexing:** Linked Qdrant synchronization into `approveConversionRequest` so newly approved conversion requests are automatically indexed in Qdrant (with rollback safety). Also populated `requestedBy` to dynamically resolve user roles for notifications.
 
 ---
 
