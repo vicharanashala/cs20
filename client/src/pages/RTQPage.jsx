@@ -425,7 +425,7 @@ export default function RTQPage() {
                               <FileText className="w-4 h-4" />
                             </button>
                           )}
-                          {isOwner && rtq.status !== 'resolved' && (
+                          {isOwner && rtq.status !== 'resolved' && rtq.status !== 'rejected' && (
                             <button
                               onClick={() => { rtqService.updateStatus(rtq._id, 'resolved').then(() => loadRTQs(page)); }}
                               className="p-1.5 border border-green-200 text-green-600 rounded hover:bg-green-50 transition-colors"
@@ -545,7 +545,7 @@ export default function RTQPage() {
                                       )}
                                     </>
                                   )}
-                                  {isOwner && rtq.status !== 'resolved' && (
+                                  {isOwner && rtq.status !== 'resolved' && rtq.status !== 'rejected' && (
                                     <button
                                       onClick={() => handleSelectAnswer(rtq._id, ans._id)}
                                       className="p-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"

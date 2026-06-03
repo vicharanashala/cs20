@@ -85,18 +85,35 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="card-padded text-center">
-              <div className="text-3xl font-bold text-primary">{user?.qp || 0}</div>
-              <div className="text-xs text-muted mt-1">Quality Points</div>
+          {user?.restrictedAt && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+              <p className="text-sm text-amber-800">
+                Your account is restricted. QP is below {50}. You cannot ask questions until QP reaches {50}.
+              </p>
             </div>
-            <div className="card-padded text-center">
-              <div className="text-3xl font-bold text-primary">{recentRTQs.length}</div>
-              <div className="text-xs text-muted mt-1">Open Questions</div>
+          )}
+
+<div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="card-padded flex items-center gap-4">
+              <div className="text-4xl font-bold text-primary">{user?.qp || 0}</div>
+              <div>
+                <div className="text-sm font-semibold text-primary">Quality Points</div>
+                <div className="text-xs text-muted">Your reputation score</div>
+              </div>
             </div>
-            <div className="card-padded text-center">
-              <div className="text-3xl font-bold text-primary">{stats.unreadCount}</div>
-              <div className="text-xs text-muted mt-1">Unread Notifications</div>
+            <div className="card-padded flex items-center gap-4">
+              <div className="text-4xl font-bold text-primary">{recentRTQs.length}</div>
+              <div>
+                <div className="text-sm font-semibold text-primary">Open Questions</div>
+                <div className="text-xs text-muted">Awaiting answers</div>
+              </div>
+              {stats.unreadCount > 0 && (
+                <div className="ml-auto flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="text-sm text-amber-600 font-medium">{stats.unreadCount} unread</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -113,6 +130,90 @@ export default function StudentDashboard() {
             })}
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-indigo-500" />
+                  <h2 className="text-base font-bold text-primary">Trending FAQs</h2>
+                  {recentFAQs.length > 0 && (
+                    <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded-full font-medium">{recentFAQs.length}</span>
+                  )}
+                </div>
+                <Link to="/faq" className="text-xs text-primary font-semibold hover:underline flex items-center gap-1">
+                  View all <span aria-hidden="true">→</span>
+                </Link>
+              </div>
+              <div className="card-padded">
+                {recentFAQs.length === 0 ? (
+                  <p className="text-sm text-muted text-center py-6">No trending FAQs yet</p>
+                ) : recentFAQs.map(faq => (
+                  <div key={faq._id} className="group flex items-start gap-3 py-3 first:pt-0 last:pb-0 hover:bg-surface/60 rounded-lg px-2 -mx-2 transition-colors cursor-pointer">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-primary leading-snug line-clamp-2">{faq.question}</p>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        {faq.category && (
+                          <span className="text-xs px-1.5 py-0.5 bg-indigo-50 text-indigo-600 rounded font-medium">{faq.category}</span>
+                        )}
+                        {faq.isTrending && (
+                          <span className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded font-medium">
+                            <TrendingUp className="w-3 h-3" /> Trending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                      <span className="text-sm font-bold text-green-600">{faq.upvotes}</span>
+                      <span className="text-xs text-muted">upvotes</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-amber-500" />
+                  <h2 className="text-base font-bold text-primary">Open Questions</h2>
+                  {recentRTQs.length > 0 && (
+                    <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-600 rounded-full font-medium">{recentRTQs.length}</span>
+                  )}
+                </div>
+                <Link to="/rtq" className="text-xs text-primary font-semibold hover:underline flex items-center gap-1">
+                  View all <span aria-hidden="true">→</span>
+                </Link>
+              </div>
+              <div className="card-padded">
+                {recentRTQs.length === 0 ? (
+                  <p className="text-sm text-muted text-center py-6">No open questions</p>
+                ) : recentRTQs.map(rtq => (
+                  <div key={rtq._id} className={`group flex items-start gap-3 py-3 first:pt-0 last:pb-0 hover:bg-surface/60 rounded-lg px-2 -mx-2 transition-colors cursor-pointer ${!rtq.isRead ? 'bg-indigo-50/50' : ''}`}>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-primary leading-snug line-clamp-2">{rtq.question}</p>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        {rtq.category && (
+                          <span className="text-xs px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded font-medium">{rtq.category}</span>
+                        )}
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                          rtq.status === 'resolved' ? 'bg-green-50 text-green-600' :
+                          rtq.status === 'partially_resolved' ? 'bg-amber-50 text-amber-600' :
+                          'bg-red-50 text-red-600'
+                        }`}>
+                          {rtq.status === 'resolved' ? 'Resolved' : rtq.status === 'partially_resolved' ? 'Partial' : 'Unresolved'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                      <span className="text-sm font-bold text-primary">{rtq.answers?.length || 0}</span>
+                      <span className="text-xs text-muted">answers</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-3 gap-4 mb-8">
             {[
               { label: 'RTQs (7d)', data: trends.rtq, color: '#6366f1', total: trends.rtq.reduce((s, d) => s + d.count, 0) },
@@ -125,35 +226,6 @@ export default function StudentDashboard() {
                   <span className="text-xs text-muted">{total} total</span>
                 </div>
                 <MiniChart data={data} color={color} height={32} />
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {[
-              { title: 'Trending FAQs', items: recentFAQs, empty: 'No FAQs yet', link: '/faq', render: faq => (
-                <div key={faq._id} className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-primary truncate flex-1 pr-2">{faq.question}</p>
-                  <span className="text-xs text-muted shrink-0">{faq.upvotes} ↑</span>
-                </div>
-              )},
-              { title: 'Open Questions', items: recentRTQs, empty: 'No open questions', link: '/rtq', render: rtq => (
-                <div key={rtq._id} className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-primary truncate flex-1 pr-2">{rtq.question}</p>
-                  <span className="text-xs text-muted shrink-0">{rtq.answers?.length || 0} ans</span>
-                </div>
-              )},
-            ].map(({ title, items, empty, link, render }) => (
-              <div key={title}>
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="section-title">{title}</h2>
-                  <Link to={link} className="text-xs text-primary font-medium hover:underline">View all</Link>
-                </div>
-                <div className="card-padded divide-y divide-border">
-                  {items.length === 0 ? (
-                    <p className="text-sm text-muted text-center py-4">{empty}</p>
-                  ) : items.map(render)}
-                </div>
               </div>
             ))}
           </div>

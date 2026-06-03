@@ -4,7 +4,7 @@ import FAQ from '../models/FAQ.model.js';
 import User from '../models/User.model.js';
 import { awardQP, deductQP } from '../services/qp.service.js';
 import { notifyUser } from '../services/notification.service.js';
-import { QP_RULES } from '../../../shared/constants.js';
+import { QP_RULES, QP_THRESHOLDS } from '../../../shared/constants.js';
 import { generateEmbedding } from '../services/vector/embedding.service.js';
 import { evaluateQuestion } from '../../../rag-engine/decision-engine/decision.tree.js';
 import { syncRTQInsert, syncRTQDelete, rollbackRTQInsert } from '../services/sync/rtq.sync.service.js';
@@ -90,6 +90,13 @@ export async function submitQuestion(req, res) {
     const { question, category, tags } = req.body;
     if (!question || !category) {
       return res.status(400).json({ message: 'question and category are required' });
+    }
+
+    if (req.user.qp < QP_THRESHOLDS.MIN_TO_ASK_QUESTION) {
+      return res.status(403).json({
+        message: `Minimum ${QP_THRESHOLDS.MIN_TO_ASK_QUESTION} QP required to ask a question. Current QP: ${req.user.qp}`,
+        code: 'QP_TOO_LOW'
+      });
     }
 
     const result = await evaluateQuestion(question);

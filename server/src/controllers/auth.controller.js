@@ -64,7 +64,8 @@ export async function login(req, res) {
 
 export async function me(req, res) {
   try {
-    res.json(req.user);
+    const fresh = await getMe(req.user._id);
+    res.json(fresh);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

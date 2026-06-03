@@ -16,6 +16,10 @@ export async function markAsRead(notificationId, userId) {
   );
 }
 
+export async function deleteNotification(notificationId, userId) {
+  return await Notification.findOneAndDelete({ _id: notificationId, userId });
+}
+
 export async function getUnreadCount(userId) {
   return await Notification.countDocuments({ userId, read: false });
 }

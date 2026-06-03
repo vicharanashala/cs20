@@ -349,7 +349,7 @@ export default function RTQDetailPage() {
         )}
 
         <div className="mt-4 pt-4 border-t border-border flex items-center justify-between flex-wrap gap-2">
-          {isOwner && rtq.status !== 'resolved' && (
+          {isOwner && rtq.status !== 'resolved' && rtq.status !== 'rejected' && (
             <button
               onClick={() => {
                 if (!confirm('Mark this question as fully resolved?')) return;
@@ -412,7 +412,7 @@ export default function RTQDetailPage() {
                 </div>
               )}
 
-              {isOwner && rtq.status !== 'resolved' && rtq.answers?.length > 0 && (
+              {isOwner && rtq.status !== 'resolved' && rtq.status !== 'rejected' && rtq.answers?.length > 0 && (
                 <span className="text-xs text-muted px-1">Select an answer:</span>
               )}
 
@@ -536,7 +536,7 @@ export default function RTQDetailPage() {
                       )}
                     </>
                   )}
-                  {isOwner && rtq.status !== 'resolved' && (
+                  {isOwner && rtq.status !== 'resolved' && rtq.status !== 'rejected' && (
                     <>
                       <button
                         onClick={() => handleSelectAnswer(ans._id)}

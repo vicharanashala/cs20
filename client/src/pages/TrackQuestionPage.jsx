@@ -80,21 +80,23 @@ export default function TrackQuestionPage() {
                           <span className="text-xs text-muted">{rtq.category}</span>
                           <span className="text-xs text-muted">{timeAgo(rtq.createdAt)}</span>
                           <span className="text-xs text-muted">• {rtq.answers?.length || 0} answers</span>
-                          <select
-                            value={rtq.status || 'unresolved'}
-                            onChange={e => handleRTQStatusUpdate(rtq._id, e.target.value)}
-                            className={`text-xs font-semibold px-2 py-0.5 rounded-md border shadow-sm cursor-pointer focus:outline-none focus:ring-2 ${
-                              rtq.status === 'resolved'
-                                ? 'bg-green-50 text-green-700 border-green-200 focus:ring-green-400'
-                                : rtq.status === 'partially_resolved'
-                                ? 'bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-400'
-                                : 'bg-red-50 text-red-700 border-red-200 focus:ring-red-400'
-                            }`}
-                          >
-                            <option value="unresolved" className="bg-red-50 text-red-700">Unresolved</option>
-                            <option value="partially_resolved" className="bg-blue-50 text-blue-700">Partially Resolved</option>
-                            <option value="resolved" className="bg-green-50 text-green-700">Resolved</option>
-                          </select>
+                          {rtq.status !== 'rejected' && (
+                            <select
+                              value={rtq.status || 'unresolved'}
+                              onChange={e => handleRTQStatusUpdate(rtq._id, e.target.value)}
+                              className={`text-xs font-semibold px-2 py-0.5 rounded-md border shadow-sm cursor-pointer focus:outline-none focus:ring-2 ${
+                                rtq.status === 'resolved'
+                                  ? 'bg-green-50 text-green-700 border-green-200 focus:ring-green-400'
+                                  : rtq.status === 'partially_resolved'
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-400'
+                                  : 'bg-red-50 text-red-700 border-red-200 focus:ring-red-400'
+                              }`}
+                            >
+                              <option value="unresolved" className="bg-red-50 text-red-700">Unresolved</option>
+                              <option value="partially_resolved" className="bg-blue-50 text-blue-700">Partially Resolved</option>
+                              <option value="resolved" className="bg-green-50 text-green-700">Resolved</option>
+                            </select>
+                          )}
                         </div>
                         {rtq.isAccepted && (
                           <StatusBadge status="accepted" role={rtq.acceptedBy?.role} />

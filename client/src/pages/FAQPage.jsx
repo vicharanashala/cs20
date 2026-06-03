@@ -6,12 +6,13 @@ import { useQP } from '../context/QPContext';
 import UpvoteButton from '../components/UpvoteButton';
 import { FAQ_CATEGORIES } from '../utils/constants';
 import { timeAgo } from '../utils/helpers';
-import { ArrowBigUp, Settings, Check, X, BookOpen } from 'lucide-react';
+import { ArrowBigUp, Settings, Check, X, BookOpen, AlertTriangle, Star } from 'lucide-react';
 import { cn } from '../utils/helpers';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import BackToTop from '../components/BackToTop';
 import Breadcrumb from '../components/Breadcrumb';
 import { StatusBadge } from '../components/Badge';
+import LoginModal from '../components/LoginModal';
 
 export default function FAQPage() {
   const { user } = useAuth();
@@ -28,6 +29,7 @@ export default function FAQPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [activeFAQSettingsId, setActiveFAQSettingsId] = useState(null);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   const [faqRequests, setFaqRequests] = useState([]);
   const [faqRequestsLoading, setFaqRequestsLoading] = useState(false);
@@ -114,6 +116,7 @@ export default function FAQPage() {
   useEffect(() => { loadFAQs(page); }, [page]);
 
   const handleUpvote = async (faqId) => {
+    if (!user) { setLoginModalOpen(true); return; }
     const prevGrouped = grouped;
     setGrouped(prev => {
       const next = {};
@@ -143,6 +146,7 @@ export default function FAQPage() {
   };
 
   const handleCategoryUpvote = async (categoryName) => {
+    if (!user) { setLoginModalOpen(true); return; }
     const prevRanked = rankedCategories;
 
     // Optimistic update
@@ -413,7 +417,7 @@ export default function FAQPage() {
                                       }}
                                       className="w-full text-left px-3 py-2 text-xs text-amber-600 hover:bg-amber-50 font-semibold flex items-center gap-1.5"
                                     >
-                                      ⚠️ {faq.markedForReview ? 'Remove Flag' : 'Flag for Review'}
+                                      <AlertTriangle className="w-3.5 h-3.5" /> {faq.markedForReview ? 'Remove Flag' : 'Flag for Review'}
                                     </button>
                                     <button
                                       onClick={() => {
@@ -422,7 +426,7 @@ export default function FAQPage() {
                                       }}
                                       className="w-full text-left px-3 py-2 text-xs text-primary hover:bg-slate-50 font-semibold flex items-center gap-1.5"
                                     >
-                                      ⭐ {faq.isTrending ? 'Remove Trending' : 'Set on Trending'}
+                                      <Star className="w-3.5 h-3.5" /> {faq.isTrending ? 'Remove Trending' : 'Set on Trending'}
                                     </button>
                                     {isSenior && (
                                       <>
@@ -496,6 +500,7 @@ export default function FAQPage() {
       )}
 
       <BackToTop />
+      <LoginModal isOpen={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
     </div>
   );
 }

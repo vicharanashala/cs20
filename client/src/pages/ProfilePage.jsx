@@ -1,40 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import userService from '../services/user.service';
-import qpService from '../services/qp.service';
 import QPBadge from '../components/QPBadge';
-import { formatQP, timeAgo } from '../utils/helpers';
 import { ROLE_LABELS } from '../utils/constants';
 import Breadcrumb from '../components/Breadcrumb';
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
-  const [history, setHistory] = useState([]);
-  const [historyPage, setHistoryPage] = useState(1);
-  const [historyTotal, setHistoryTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({ name: '' });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '' });
   const [saveMsg, setSaveMsg] = useState('');
-  const historyLimit = 15;
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await qpService.getHistory({ page: historyPage, limit: historyLimit });
-        const items = Array.isArray(res) ? res : (res.data || []);
-        setHistory(items);
-        if (res.pagination) setHistoryTotal(res.pagination.total);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [historyPage]);
 
   const handleProfileUpdate = async e => {
     e.preventDefault();
@@ -116,55 +92,5 @@ export default function ProfilePage() {
           <button type="submit" className="btn-primary text-sm">Change Password</button>
         </form>
       </div>
-
-      <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-primary">QP History</h3>
-          {historyTotal > 0 && (
-            <span className="text-xs text-muted">{historyTotal} total</span>
-          )}
-        </div>
-        {loading ? (
-          <p className="text-sm text-muted">Loading...</p>
-        ) : history.length === 0 ? (
-          <p className="text-sm text-muted text-center py-4">No QP transactions yet.</p>
-        ) : (
-          <>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {history.map(tx => (
-                <div key={tx._id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div>
-                    <p className="text-sm text-primary">{tx.reason}</p>
-                    <p className="text-xs text-muted">{timeAgo(tx.createdAt)}</p>
-                  </div>
-                  <span className={`text-sm font-semibold ${tx.type === 'earn' ? 'text-green-600' : 'text-red-500'}`}>
-                    {tx.type === 'earn' ? '+' : '-'}{tx.amount}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {Math.ceil(historyTotal / historyLimit) > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-4 pt-3 border-t border-border">
-                <button
-                  onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
-                  disabled={historyPage === 1}
-                  className="btn-secondary text-xs px-3 py-1 disabled:opacity-40"
-                >
-                  Prev
-                </button>
-                <span className="text-xs text-muted">Page {historyPage}</span>
-                <button
-                  onClick={() => setHistoryPage(p => p + 1)}
-                  disabled={historyPage >= Math.ceil(historyTotal / historyLimit)}
-                  className="btn-secondary text-xs px-3 py-1 disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
   );
 }

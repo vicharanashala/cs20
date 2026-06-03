@@ -94,6 +94,7 @@ export default function Nav({ refreshUser }) {
     { to: '/dashboard', label: 'Dashboard' },
     { to: '/faq', label: 'FAQs' },
     { to: '/rtq', label: 'RTQ' },
+    { to: '/track', label: 'Track' },
     ...(user?.role === 'student' || user?.role === 'moderator'
       ? [{ to: '/raise-question', label: 'Ask' }]
       : []),
@@ -102,6 +103,7 @@ export default function Nav({ refreshUser }) {
       : []),
     { to: '/users', label: 'Users' },
     { to: '/profile', label: 'Profile' },
+    { to: '/qp-history', label: 'QP History' },
   ];
 
   return (
@@ -187,13 +189,17 @@ export default function Nav({ refreshUser }) {
             )}
           </div>
 
-          <div className={`text-sm font-semibold px-2.5 py-1 rounded-lg transition-all duration-300 ${
-            qpAnimate
-              ? 'bg-emerald-100 text-emerald-700 scale-105'
-              : 'text-primary bg-slate-100'
-          }`}>
+          <button
+            onClick={() => navigate('/qp-history')}
+            className={`text-sm font-semibold px-2.5 py-1 rounded-lg transition-all duration-300 hover:opacity-80 cursor-pointer ${
+              qpAnimate
+                ? 'bg-emerald-100 text-emerald-700 scale-105'
+                : 'text-primary bg-slate-100'
+            }`}
+            title="View QP History"
+          >
             {qp} QP
-          </div>
+          </button>
 
           <div className="text-xs text-muted px-1">@{user?.username}</div>
 

@@ -185,10 +185,18 @@ export default function SignupPage() {
           )}
 
           {step === 1 && !restricted && (
-            <p className="text-center text-sm text-muted mt-6">
-              Already have an account?{' '}
-              <Link to="/login" className="text-primary font-medium hover:underline">Sign in</Link>
-            </p>
+            <>
+              <p className="text-center text-sm text-muted mt-6">
+                Already have an account?{' '}
+                <Link to="/login" className="text-primary font-medium hover:underline">Sign in</Link>
+              </p>
+              <p className="text-center text-sm text-muted mt-3">
+                <Link to="/faq" className="text-primary font-medium hover:underline">
+                  Browse FAQs
+                </Link>
+                {' '}without signing in
+              </p>
+            </>
           )}
         </div>
       </div>

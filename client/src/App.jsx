@@ -22,6 +22,7 @@ import UserProfilePage from './pages/UserProfilePage';
 import TrackQuestionPage from './pages/TrackQuestionPage';
 import WorkingHistoryPage from './pages/WorkingHistoryPage';
 import NotificationsPage from './pages/NotificationsPage';
+import QPHistoryPage from './pages/QPHistoryPage';
 
 function LoadingScreen() {
   return (
@@ -56,12 +57,12 @@ function DashboardRoute() {
   return <StudentDashboard />;
 }
 
-const PUBLIC_PATHS = ['/login', '/signup'];
+const PUBLIC_PATHS = ['/login', '/signup', '/faq'];
 
 function AppLayout() {
   const location = useLocation();
   const { user, refreshUser } = useAuth();
-  const isPublic = PUBLIC_PATHS.includes(location.pathname);
+  const isPublicPage = PUBLIC_PATHS.includes(location.pathname);
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
@@ -77,13 +78,13 @@ function AppLayout() {
 
   return (
     <div className="min-h-screen bg-surface">
-      {user && !isPublic && <Nav refreshUser={refreshUser} />}
+      {user && !isPublicPage && <Nav refreshUser={refreshUser} />}
       {searchOpen && <GlobalSearch onClose={() => setSearchOpen(false)} />}
       <Routes>
         <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
         <Route path="/signup" element={<PublicOnly><SignupPage /></PublicOnly>} />
         <Route path="/dashboard" element={<DashboardRoute />} />
-        <Route path="/faq" element={<ProtectedRoute><FAQPage /></ProtectedRoute>} />
+        <Route path="/faq" element={<FAQPage />} />
         <Route path="/faq/edit/:id" element={<ProtectedRoute allowedRoles={['senior', 'admin']}><FAQEditPage /></ProtectedRoute>} />
         <Route path="/rtq" element={<ProtectedRoute><RTQPage /></ProtectedRoute>} />
         <Route path="/rtq/:id" element={<ProtectedRoute><RTQDetailPage /></ProtectedRoute>} />
@@ -93,10 +94,11 @@ function AppLayout() {
         <Route path="/track" element={<ProtectedRoute><TrackQuestionPage /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><WorkingHistoryPage /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/qp-history" element={<ProtectedRoute><QPHistoryPage /></ProtectedRoute>} />
         <Route path="/raise-question" element={<ProtectedRoute allowedRoles={['student', 'moderator']}><RaiseQuestionPage /></ProtectedRoute>} />
         <Route path="/add-faq" element={<ProtectedRoute allowedRoles={['senior', 'admin']}><AddFAQPage /></ProtectedRoute>} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to="/faq" replace />} />
+        <Route path="*" element={<Navigate to="/faq" replace />} />
       </Routes>
     </div>
   );

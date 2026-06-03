@@ -73,6 +73,12 @@ export default function LoginPage() {
               Sign up
             </Link>
           </p>
+          <p className="text-center text-sm text-muted mt-3">
+            <Link to="/faq" className="text-primary font-medium hover:underline">
+              Browse FAQs
+            </Link>
+            {' '}without signing in
+          </p>
         </div>
       </div>
     </div>

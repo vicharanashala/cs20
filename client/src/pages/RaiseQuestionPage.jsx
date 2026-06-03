@@ -4,6 +4,7 @@ import rtqService from '../services/rtq.service';
 import ragService from '../services/rag.service';
 import { FAQ_CATEGORIES } from '../utils/constants';
 import Breadcrumb from '../components/Breadcrumb';
+import { Search } from 'lucide-react';
 
 export default function RaiseQuestionPage() {
   const [form, setForm] = useState({ question: '', category: '', tags: '' });
@@ -110,7 +111,7 @@ export default function RaiseQuestionPage() {
               className="mt-2 text-sm text-primary font-medium hover:underline"
               disabled={!form.question}
             >
-              🔍 Check for duplicates first
+              <Search className="w-4 h-4" /> Check for duplicates first
             </button>
           </div>
           <div>

@@ -6,7 +6,8 @@ import Breadcrumb from '../components/Breadcrumb';
 import BackToTop from '../components/BackToTop';
 import {
   CheckCircle, XCircle, MessageCircle, Star, Pin,
-  Trash2, Bell, UserCheck, RefreshCw, Trophy, Check
+  Trash2, Bell, UserCheck, RefreshCw, Trophy, Check,
+  TrendingUp, TrendingDown
 } from 'lucide-react';
 
 export default function NotificationsPage() {
@@ -51,6 +52,25 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleDelete = async (id) => {
+    try {
+      await notificationService.deleteNotification(id);
+      setNotifications(prev => prev.filter(n => n._id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!confirm('Delete all notifications? This cannot be undone.')) return;
+    try {
+      await Promise.all(notifications.map(n => notificationService.deleteNotification(n._id)));
+      setNotifications([]);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const getIcon = (type) => {
     const icons = {
       question_accepted: CheckCircle,
@@ -65,6 +85,8 @@ export default function NotificationsPage() {
       account_approved: Check,
       role_changed: RefreshCw,
       promotion_eligible: Trophy,
+      qp_earned: TrendingUp,
+      qp_deducted: TrendingDown,
     };
     const Comp = icons[type] || Bell;
     return <Comp className="w-4 h-4 shrink-0" />;
@@ -80,11 +102,18 @@ export default function NotificationsPage() {
           <h1 className="text-2xl font-bold text-primary">Notifications</h1>
           {unread > 0 && <p className="text-sm text-muted">{unread} unread</p>}
         </div>
-        {unread > 0 && (
-          <button onClick={handleMarkAllRead} className="text-sm text-primary font-medium hover:underline">
-            Mark all as read
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {unread > 0 && (
+            <button onClick={handleMarkAllRead} className="text-sm text-primary font-medium hover:underline">
+              Mark all as read
+            </button>
+          )}
+          {notifications.length > 0 && (
+            <button onClick={handleDeleteAll} className="text-sm text-red-500 font-medium hover:underline">
+              Delete all
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -127,13 +156,21 @@ export default function NotificationsPage() {
                 <p className="text-[10px] text-muted-foreground mt-1 tracking-wider uppercase">{timeAgo(notif.createdAt)}</p>
               </div>
 
-              {!notif.read && (
+              {!notif.read ? (
                 <button
                   onClick={() => handleMarkRead(notif._id)}
                   className="p-2 rounded-full border border-slate-200 hover:border-primary hover:bg-slate-50 text-muted-foreground hover:text-primary transition-all duration-200 flex-shrink-0"
                   title="Mark as Read"
                 >
                   <Check className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleDelete(notif._id)}
+                  className="p-2 rounded-full border border-slate-200 hover:border-red-300 hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-all duration-200 flex-shrink-0"
+                  title="Delete notification"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
