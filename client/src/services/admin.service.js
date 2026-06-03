@@ -5,6 +5,8 @@ const adminService = {
   approveUser: (userId) => api.post('/admin/approve-user', { userId }),
   rejectUser: (userId) => api.post('/admin/reject-user', { userId }),
   assignRole: (data) => api.patch('/admin/assign-role', data),
+  blockUser: (userId) => api.patch(`/admin/users/${userId}/block`),
+  unblockUser: (userId) => api.patch(`/admin/users/${userId}/unblock`),
 
   getWhitelist: () => api.get('/admin/whitelist'),
   addToWhitelist: (data) => api.post('/admin/whitelist', data),

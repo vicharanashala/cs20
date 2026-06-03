@@ -1,21 +1,22 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import userService from '../services/user.service';
 import adminService from '../services/admin.service';
 import { useAuth } from '../context/AuthContext';
 import QPBadge from '../components/QPBadge';
-import { ROLE_LABELS } from '../utils/constants';
+import { RoleBadge } from '../components/Badge';
 import { timeAgo } from '../utils/helpers';
 import Breadcrumb from '../components/Breadcrumb';
+import { Check, X, Trophy, Crown } from 'lucide-react';
 
 export default function UserListPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [tab, setTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [activeListTab, setActiveListTab] = useState('peers');
 
   const [whitelist, setWhitelist] = useState([]);
   const [wlLoading, setWlLoading] = useState(false);
@@ -96,12 +97,26 @@ const handleRestrict = async (userId) => {
     }
   };
 
-  const handleRemove = async (userId) => {
-    if (!confirm('Remove this user? This cannot be undone.')) return;
+  const handleBlock = async (userId) => {
+    if (!confirm('Block this user? They will not be able to access their account.')) return;
+    const prev = users;
+    setUsers(prev => prev.map(x => x._id === userId ? { ...x, status: 'blocked', restrictedAt: new Date() } : x));
     try {
-      await userService.removeUser(userId);
-      loadUsers();
+      await adminService.blockUser(userId);
     } catch (err) {
+      setUsers(prev);
+      alert(err.message);
+    }
+  };
+
+  const handleUnblock = async (userId) => {
+    if (!confirm('Unblock this user? They will regain access to their account.')) return;
+    const prev = users;
+    setUsers(prev => prev.map(x => x._id === userId ? { ...x, status: 'active', restrictedAt: null } : x));
+    try {
+      await adminService.unblockUser(userId);
+    } catch (err) {
+      setUsers(prev);
       alert(err.message);
     }
   };
@@ -156,30 +171,142 @@ const handleRestrict = async (userId) => {
     u.email?.toLowerCase().includes(search.toLowerCase())
   );
 
-  return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
-      <Breadcrumb items={[{ label: 'Users' }]} />
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-primary">User Management</h1>
-      </div>
+  const canSeeSeniorsAndAdmins = isSenior || isAdmin;
 
-      {isAdmin && (
-        <div className="flex gap-2 mb-6 border-b border-border">
-          {['users', 'whitelist', 'requests'].map(t => (
+  const studentModerators = filtered.filter(u => u.role === 'student' || u.role === 'moderator');
+  const seniorAdmins = filtered.filter(u => u.role === 'senior' || u.role === 'admin');
+
+  const renderUserList = (listToRender, title) => {
+    return (
+      <div className="flex-1 min-w-0">
+        {canSeeSeniorsAndAdmins && (
+          <div className="flex items-center justify-between mb-4 border-b border-border pb-2">
+            <h2 className="text-lg font-bold text-primary">{title}</h2>
+            <span className="text-xs font-semibold px-2 py-0.5 bg-slate-100 text-muted rounded-full">
+              {listToRender.length} {listToRender.length === 1 ? 'user' : 'users'}
+            </span>
+          </div>
+        )}
+        {listToRender.length === 0 ? (
+          <div className="text-center py-8 text-muted border border-dashed border-border rounded-2xl bg-white">
+            No users found in this list
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {listToRender.map((u, idx) => {
+              const rank = idx + 1;
+              const isTop3 = rank <= 3;
+              const isCurrentUser = u._id === user._id;
+              const rankIcon = rank === 1 ? <Crown className="w-5 h-5 text-amber-500" /> : rank === 2 ? <Trophy className="w-5 h-5 text-slate-400" /> : rank === 3 ? <Trophy className="w-5 h-5 text-orange-400" /> : null;
+
+              return (
+                <div
+                  key={u._id}
+                  className={`card-padded flex items-center gap-4 ${
+                    isCurrentUser ? 'ring-2 ring-primary/20 bg-primary/[0.02]' : ''
+                  } ${isTop3 ? 'border-2' : 'border'}`}
+                  style={isTop3 ? {
+                    borderColor: rank === 1 ? '#fbbf24' : rank === 2 ? '#cbd5e1' : rank === 3 ? '#fb923c' : undefined,
+                  } : undefined}
+                >
+                  <div className="w-8 text-center shrink-0">
+                    {rankIcon || <span className="text-sm font-semibold text-muted">{rank}</span>}
+                  </div>
+                  <Link to={`/users/${u._id}`} className="flex-1 min-w-0 hover:opacity-80 transition-opacity">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold truncate text-primary">{u.name}</p>
+                      {isCurrentUser && <span className="text-xs text-muted">(you)</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-muted">@{u.username}</span>
+                      <span className="text-muted">&middot;</span>
+                      <RoleBadge role={u.role} />
+                    </div>
+                  </Link>
+                  <div className="text-right shrink-0">
+                    {u.status === 'blocked' && (
+                      <span className="inline-block text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded mb-1">Blocked</span>
+                    )}
+                    <QPBadge qp={u.qp || 0} />
+                    <p className="text-xs text-muted mt-0.5">joined {timeAgo(u.createdAt)}</p>
+                  </div>
+                  {(isSenior || isAdmin) && (
+                    <div className="flex gap-1.5 shrink-0">
+                      {isAdmin && (
+                        <select
+                          value={u.role}
+                          onChange={e => handleAssignRole(u._id, e.target.value)}
+                          className="input-sm text-xs"
+                        >
+                          <option value="student">Student</option>
+                          <option value="moderator">Moderator</option>
+                          <option value="senior">Senior</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      )}
+                      <button
+                        onClick={() => handleRestrict(u._id)}
+                        className={`btn-ghost-sm ${u.restrictedAt ? 'text-red-500' : ''}`}
+                        title={u.restrictedAt ? 'Unrestrict' : 'Restrict'}
+                      >
+                        {u.restrictedAt ? 'Unrestrict' : 'Restrict'}
+                      </button>
+                      {isAdmin && (
+                        u.status === 'blocked' ? (
+                          <button
+                            onClick={() => handleUnblock(u._id)}
+                            className="btn-ghost-sm text-green-600"
+                            title="Unblock"
+                          >
+                            Unblock
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleBlock(u._id)}
+                            className="btn-ghost-sm text-red-500"
+                            title="Block"
+                          >
+                            Block
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-6">
+      <Breadcrumb items={[{ label: 'Leaderboard' }]} />
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="page-title">Leaderboard</h1>
+        {isAdmin && (
+          <div className="flex gap-2">
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                tab === t
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted hover:text-primary'
+              onClick={() => setTab('whitelist')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                tab === 'whitelist' ? 'bg-primary text-white' : 'bg-slate-100 text-muted hover:bg-slate-200'
               }`}
             >
-              {t === 'users' ? 'Users' : t === 'whitelist' ? 'Email Whitelist' : 'Access Requests'}
+              Whitelist
             </button>
-          ))}
-        </div>
-      )}
+            <button
+              onClick={() => setTab('requests')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                tab === 'requests' ? 'bg-primary text-white' : 'bg-slate-100 text-muted hover:bg-slate-200'
+              }`}
+            >
+              Access Requests
+            </button>
+          </div>
+        )}
+      </div>
 
       {tab === 'users' && (
         <>
@@ -191,91 +318,50 @@ const handleRestrict = async (userId) => {
               placeholder="Search users..."
               className="input flex-1"
             />
-            <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="input w-auto">
+            <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="select w-auto">
               <option value="">All Roles</option>
               <option value="student">Student</option>
               <option value="moderator">Moderator</option>
-              <option value="senior">Senior</option>
+              {canSeeSeniorsAndAdmins && <option value="senior">Senior</option>}
               {isAdmin && <option value="admin">Admin</option>}
             </select>
           </div>
 
           {loading ? (
             <div className="text-center py-12 text-muted">Loading users...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted">No users found</div>
           ) : (
-            <div className="card overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-surface border-b border-border">
-                  <tr>
-                    <th className="text-left p-3 font-medium text-muted">User</th>
-                    <th className="text-left p-3 font-medium text-muted">Role</th>
-                    <th className="text-left p-3 font-medium text-muted">QP</th>
-                    <th className="text-left p-3 font-medium text-muted">Status</th>
-                    <th className="text-left p-3 font-medium text-muted">Joined</th>
-                    {(isSenior || isAdmin) && <th className="text-left p-3 font-medium text-muted">Actions</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(u => (
-                    <tr key={u._id} className="border-b border-border last:border-0 hover:bg-surface">
-                      <td className="p-3">
-                        <Link to={`/users/${u._id}`} className="font-medium text-primary hover:underline">{u.name}</Link>
-                        <div className="text-xs text-muted">@{u.username}</div>
-                      </td>
-                      <td className="p-3">
-                        {isAdmin ? (
-                          <select
-                            value={u.role}
-                            onChange={e => handleAssignRole(u._id, e.target.value)}
-                            className="input py-1 text-xs w-auto"
-                          >
-                            <option value="student">Student</option>
-                            <option value="moderator">Moderator</option>
-                            <option value="senior">Senior</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        ) : (
-                          <span className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded">{ROLE_LABELS[u.role] || u.role}</span>
-                        )}
-                      </td>
-                      <td className="p-3"><QPBadge qp={u.qp || 0} small /></td>
-                      <td className="p-3">
-                        {u.restrictedAt ? (
-                          <span className="text-xs text-red-600">Restricted</span>
-                        ) : u.status === 'blocked' ? (
-                          <span className="text-xs text-red-600">Blocked</span>
-                        ) : (
-                          <span className="text-xs text-green-600">Active</span>
-                        )}
-                      </td>
-                      <td className="p-3 text-xs text-muted">{timeAgo(u.createdAt)}</td>
-                      {(isSenior || isAdmin) && (
-                        <td className="p-3">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleRestrict(u._id)}
-                              className="text-xs px-2 py-1 border border-border rounded hover:border-orange-500 text-muted"
-                            >
-                              {u.restrictedAt ? 'Unrestrict' : 'Restrict'}
-                            </button>
-                            {isAdmin && (
-                              <button
-                                onClick={() => handleRemove(u._id)}
-                                className="text-xs px-2 py-1 border border-red-200 rounded text-red-500 hover:bg-red-50"
-                              >
-                                Remove
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filtered.length === 0 && (
-                <div className="text-center py-8 text-muted">No users found.</div>
+            <div className="space-y-6">
+              {canSeeSeniorsAndAdmins && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveListTab('peers')}
+                    className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors border ${
+                      activeListTab === 'peers'
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-muted border-border hover:bg-slate-50'
+                    }`}
+                  >
+                    Peers ({studentModerators.length})
+                  </button>
+                  <button
+                    onClick={() => setActiveListTab('seniors')}
+                    className={`px-4 py-2 text-xs font-semibold rounded-lg transition-colors border ${
+                      activeListTab === 'seniors'
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-white text-muted border-border hover:bg-slate-50'
+                    }`}
+                  >
+                    Seniors ({seniorAdmins.length})
+                  </button>
+                </div>
               )}
+
+              <div>
+                {(!canSeeSeniorsAndAdmins || activeListTab === 'peers') && renderUserList(studentModerators, "Peers")}
+                {canSeeSeniorsAndAdmins && activeListTab === 'seniors' && renderUserList(seniorAdmins, "Seniors")}
+              </div>
             </div>
           )}
         </>
@@ -391,6 +477,7 @@ const handleRestrict = async (userId) => {
           )}
         </div>
       )}
+
     </div>
   );
 }

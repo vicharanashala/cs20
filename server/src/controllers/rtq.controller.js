@@ -20,9 +20,13 @@ export async function listRTQs(req, res) {
 
     let allRtqs = await RTQ.find()
       .populate('postedBy', 'name role')
+      .populate('acceptedBy', 'name role')
       .populate({
         path: 'answers',
-        populate: { path: 'userId', select: 'name role' }
+        populate: [
+          { path: 'userId', select: 'name role' },
+          { path: 'approvedBy', select: 'name role' }
+        ]
       })
       .sort({ [sort]: -1, createdAt: -1 })
       .lean();
@@ -65,9 +69,13 @@ export async function getRTQ(req, res) {
   try {
     const rtq = await RTQ.findById(req.params.id)
       .populate('postedBy', 'name role')
+      .populate('acceptedBy', 'name role')
       .populate({
         path: 'answers',
-        populate: { path: 'userId', select: 'name role' }
+        populate: [
+          { path: 'userId', select: 'name role' },
+          { path: 'approvedBy', select: 'name role' }
+        ]
       });
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
     res.json(rtq);
@@ -318,7 +326,6 @@ export async function markAccepted(req, res) {
     }
 
     rtq.isAccepted = true;
-    rtq.status = 'resolved';
     rtq.acceptedBy = req.user._id;
     await rtq.save();
 
@@ -627,10 +634,10 @@ export async function markRTQForReview(req, res) {
     const rtq = await RTQ.findById(req.params.id);
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
 
-    rtq.markedForReview = true;
+    rtq.markedForReview = !rtq.markedForReview;
     await rtq.save();
 
-    res.json({ message: 'Question marked for review', rtq });
+    res.json({ message: `Question review status updated to ${rtq.markedForReview}`, rtq });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -642,10 +649,10 @@ export async function markAnswerForReview(req, res) {
     const answer = await Answer.findById(req.params.answerId);
     if (!answer) return res.status(404).json({ message: 'Answer not found' });
 
-    answer.markedForReview = true;
+    answer.markedForReview = !answer.markedForReview;
     await answer.save();
 
-    res.json({ message: 'Answer marked for review', answer });
+    res.json({ message: `Answer review status updated to ${answer.markedForReview}`, answer });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

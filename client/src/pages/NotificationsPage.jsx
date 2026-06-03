@@ -4,7 +4,10 @@ import { timeAgo } from '../utils/helpers';
 import { SkeletonRow } from '../components/SkeletonLoader';
 import Breadcrumb from '../components/Breadcrumb';
 import BackToTop from '../components/BackToTop';
-import { Check } from 'lucide-react';
+import {
+  CheckCircle, XCircle, MessageCircle, Star, Pin,
+  Trash2, Bell, UserCheck, RefreshCw, Trophy, Check
+} from 'lucide-react';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
@@ -50,20 +53,21 @@ export default function NotificationsPage() {
 
   const getIcon = (type) => {
     const icons = {
-      question_accepted: '✓',
-      question_rejected: '✗',
-      answer_added: '💬',
-      answer_approved: '✓',
-      answer_removed: '✗',
-      answer_selected_for_faq: '⭐',
-      question_added_to_faq: '📌',
-      question_removed: '🗑',
-      new_answer: '💬',
-      account_approved: '✅',
-      role_changed: '🔄',
-      promotion_eligible: '🎉',
+      question_accepted: CheckCircle,
+      question_rejected: XCircle,
+      answer_added: MessageCircle,
+      answer_approved: CheckCircle,
+      answer_removed: Trash2,
+      answer_selected_for_faq: Star,
+      question_added_to_faq: Pin,
+      question_removed: Trash2,
+      new_answer: MessageCircle,
+      account_approved: Check,
+      role_changed: RefreshCw,
+      promotion_eligible: Trophy,
     };
-    return icons[type] || '🔔';
+    const Comp = icons[type] || Bell;
+    return <Comp className="w-4 h-4 shrink-0" />;
   };
 
   const unread = notifications.filter(n => !n.read).length;

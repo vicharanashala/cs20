@@ -6,6 +6,7 @@ import { timeAgo } from '../utils/helpers';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import Breadcrumb from '../components/Breadcrumb';
 import BackToTop from '../components/BackToTop';
+import { StatusBadge } from '../components/Badge';
 
 export default function WorkingHistoryPage() {
   const { user } = useAuth();
@@ -85,13 +86,13 @@ export default function WorkingHistoryPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-primary">{rtq.question}</h3>
                     {rtq.isAccepted && (
-                      <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-semibold">✓ Moderator Accepted</span>
+                      <StatusBadge status="accepted" role={rtq.acceptedBy?.role} />
                     )}
                     {rtq.status === 'rejected' && (
-                      <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">✗ Moderator Rejected</span>
+                      <StatusBadge status="rejected" />
                     )}
                     {rtq.markedForReview && (
-                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">⚠️ Marked for Review</span>
+                      <StatusBadge status="markedForReview" />
                     )}
                     {rtq._converting && (
                       <span className="text-xs text-blue-500">Converting...</span>

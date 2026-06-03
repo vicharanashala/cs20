@@ -12,6 +12,10 @@ const faqService = {
   getCategories: () => api.get('/faq/categories'),
   listCategoriesRanked: () => api.get('/faq/categories/ranked'),
   upvoteCategory: (categoryName) => api.post(`/faq/categories/upvote/${encodeURIComponent(categoryName)}`),
+  requestConversion: (rtqId, suggestedAnswer) => api.post('/faq/request-conversion', { rtqId, suggestedAnswer }),
+  listConversionRequests: (status) => api.get('/faq/conversion-requests', { params: { status } }),
+  approveConversionRequest: (id) => api.patch(`/faq/conversion-requests/${id}/approve`),
+  rejectConversionRequest: (id, adminNote) => api.patch(`/faq/conversion-requests/${id}/reject`, { adminNote }),
 };
 
 export default faqService;

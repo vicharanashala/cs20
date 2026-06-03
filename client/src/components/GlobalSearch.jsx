@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import faqService from '../services/faq.service';
 import rtqService from '../services/rtq.service';
+import { BookOpen, MessageCircle } from 'lucide-react';
 
 export default function GlobalSearch({ onClose }) {
   const [query, setQuery] = useState('');
@@ -112,7 +113,7 @@ export default function GlobalSearch({ onClose }) {
                   onClick={() => go('/faq')}
                   className="w-full px-4 py-3 text-left hover:bg-surface flex items-start gap-3"
                 >
-                  <span className="text-green-500 mt-0.5 shrink-0">💡</span>
+                  <BookOpen className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-primary truncate">{faq.question}</p>
                     <p className="text-xs text-muted truncate">{faq.answer}</p>
@@ -132,7 +133,7 @@ export default function GlobalSearch({ onClose }) {
                   onClick={() => go(`/rtq/${rtq._id}`)}
                   className="w-full px-4 py-3 text-left hover:bg-surface flex items-start gap-3"
                 >
-                  <span className="text-blue-500 mt-0.5 shrink-0">❓</span>
+                  <MessageCircle className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-primary truncate">{rtq.question}</p>
                     <p className="text-xs text-muted mt-0.5">{rtq.category} • {rtq.answers?.length || 0} answers</p>

@@ -31,10 +31,13 @@ export default function AnswerCard({ answer, onUpvote, showModeratorControls = f
             <p className="text-xs text-muted">
               Answered by <span className="font-medium text-primary">{answer.userId.name}</span>
               {answer.userId?.role === 'moderator' && (
-                <span className="ml-1 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Moderator</span>
+                <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Moderator</span>
               )}
               {answer.userId?.role === 'senior' && (
-                <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Senior</span>
+                <span className="ml-1 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Senior</span>
+              )}
+              {answer.userId?.role === 'admin' && (
+                <span className="ml-1 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Admin</span>
               )}
             </p>
           )}

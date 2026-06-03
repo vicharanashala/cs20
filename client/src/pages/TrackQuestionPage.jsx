@@ -4,6 +4,7 @@ import rtqService from '../services/rtq.service';
 import { useAuth } from '../context/AuthContext';
 import { timeAgo } from '../utils/helpers';
 import Breadcrumb from '../components/Breadcrumb';
+import { StatusBadge } from '../components/Badge';
 
 export default function TrackQuestionPage() {
   const { user } = useAuth();
@@ -86,29 +87,23 @@ export default function TrackQuestionPage() {
                               rtq.status === 'resolved'
                                 ? 'bg-green-50 text-green-700 border-green-200 focus:ring-green-400'
                                 : rtq.status === 'partially_resolved'
-                                ? 'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-400'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200 focus:ring-blue-400'
                                 : 'bg-red-50 text-red-700 border-red-200 focus:ring-red-400'
                             }`}
                           >
-                            <option value="unresolved">Unresolved</option>
-                            <option value="partially_resolved">Partially Resolved</option>
-                            <option value="resolved">Resolved</option>
+                            <option value="unresolved" className="bg-red-50 text-red-700">Unresolved</option>
+                            <option value="partially_resolved" className="bg-blue-50 text-blue-700">Partially Resolved</option>
+                            <option value="resolved" className="bg-green-50 text-green-700">Resolved</option>
                           </select>
                         </div>
                         {rtq.isAccepted && (
-                          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">
-                            ✓ Moderator Accepted
-                          </span>
+                          <StatusBadge status="accepted" role={rtq.acceptedBy?.role} />
                         )}
                         {rtq.status === 'rejected' && (
-                          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-semibold">
-                            ✗ Moderator Rejected
-                          </span>
+                          <StatusBadge status="rejected" />
                         )}
                         {rtq.markedForReview && (
-                          <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-semibold">
-                            ⚠️ Marked for Review
-                          </span>
+                          <StatusBadge status="markedForReview" />
                         )}
                       </div>
                     </div>
