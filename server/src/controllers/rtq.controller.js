@@ -20,9 +20,13 @@ export async function listRTQs(req, res) {
 
     let allRtqs = await RTQ.find()
       .populate('postedBy', 'name role')
+      .populate('acceptedBy', 'name role')
       .populate({
         path: 'answers',
-        populate: { path: 'userId', select: 'name role' }
+        populate: [
+          { path: 'userId', select: 'name role' },
+          { path: 'approvedBy', select: 'name role' }
+        ]
       })
       .sort({ [sort]: -1, createdAt: -1 })
       .lean();
@@ -65,9 +69,13 @@ export async function getRTQ(req, res) {
   try {
     const rtq = await RTQ.findById(req.params.id)
       .populate('postedBy', 'name role')
+      .populate('acceptedBy', 'name role')
       .populate({
         path: 'answers',
-        populate: { path: 'userId', select: 'name role' }
+        populate: [
+          { path: 'userId', select: 'name role' },
+          { path: 'approvedBy', select: 'name role' }
+        ]
       });
     if (!rtq) return res.status(404).json({ message: 'RTQ not found' });
     res.json(rtq);

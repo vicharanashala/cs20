@@ -316,7 +316,7 @@ export default function RTQDetailPage() {
                   {rtq.isAccepted && (
                     <>
                       <span>•</span>
-                      <StatusBadge status="accepted" />
+                      <StatusBadge status="accepted" role={rtq.acceptedBy?.role} />
                     </>
                   )}
                   {rtq.status === 'rejected' && (
@@ -461,8 +461,8 @@ export default function RTQDetailPage() {
                     {ans.userId?.name || 'Unknown'}
                     {ans.userId?.role && (
                       <span className={`ml-1 text-xs px-1.5 py-0.5 rounded ${
-                        ans.userId.role === 'senior' ? 'bg-blue-100 text-blue-700' :
-                        ans.userId.role === 'moderator' ? 'bg-purple-100 text-purple-700' :
+                        ans.userId.role === 'moderator' ? 'bg-blue-100 text-blue-700' :
+                        (ans.userId.role === 'senior' || ans.userId.role === 'admin') ? 'bg-purple-100 text-purple-700' :
                         'bg-slate-100 text-slate-600'
                       }`}>
                         {ans.userId.role}
@@ -473,7 +473,7 @@ export default function RTQDetailPage() {
 
                 <div className="flex items-center gap-2 flex-wrap">
                   {(ans.approvals?.length > 0 || ans.isApproved) && (
-                    <StatusBadge status="approved" />
+                    <StatusBadge status="approved" role={ans.approvedBy?.role} />
                   )}
                   {ans.rejections?.length > 0 && (
                     <StatusBadge status="rejected" />

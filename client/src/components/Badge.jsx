@@ -1,6 +1,6 @@
 import { CheckCircle, XCircle, AlertTriangle, Clock, Circle } from 'lucide-react';
 
-export function StatusBadge({ status }) {
+export function StatusBadge({ status, role }) {
   const map = {
     resolved:       { label: 'Resolved',          icon: CheckCircle, className: 'badge-success' },
     partially_resolved: { label: 'Partially Resolved', icon: Clock,       className: 'badge-warning' },
@@ -13,7 +13,14 @@ export function StatusBadge({ status }) {
     pending:        { label: 'Pending',            icon: Clock,       className: 'badge-warning' },
   };
 
-  const config = map[status] || { label: status, icon: Circle, className: 'badge-neutral' };
+  const config = { ...(map[status] || { label: status, icon: Circle, className: 'badge-neutral' }) };
+  if (status === 'accepted' || status === 'approved') {
+    if (role === 'senior' || role === 'admin') {
+      config.className = 'badge-purple';
+    } else {
+      config.className = 'badge-info';
+    }
+  }
   const Icon = config.icon;
 
   return (

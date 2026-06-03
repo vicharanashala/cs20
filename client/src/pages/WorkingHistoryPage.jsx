@@ -86,7 +86,7 @@ export default function WorkingHistoryPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-primary">{rtq.question}</h3>
                     {rtq.isAccepted && (
-                      <StatusBadge status="accepted" />
+                      <StatusBadge status="accepted" role={rtq.acceptedBy?.role} />
                     )}
                     {rtq.status === 'rejected' && (
                       <StatusBadge status="rejected" />

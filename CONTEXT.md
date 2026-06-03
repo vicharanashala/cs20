@@ -1,6 +1,6 @@
 # CONTEXT.md — PippaQ Project Context
 
-> Last updated: 2026-06-03 | Leaderboard Layout Toggles, FAQ Requests Relocation to FAQ page, Qdrant Sync for FAQ requests, requestedAt timestamping, Client TypeErrors Fixed
+> Last updated: 2026-06-03 | Leaderboard Layout Toggles, FAQ Requests Relocation to FAQ page, Qdrant Sync for FAQ requests, requestedAt timestamping, Client TypeErrors Fixed, Role-Based Tag Highlighting and Status Colors
 
 ---
 
@@ -234,6 +234,18 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
 * **Role Expansion:** Updated backend routing (`faq.routes.js`) to grant permissions to the `'senior'` role for listing, approving, and rejecting FAQ requests, in addition to `'admin'`.
 * **Database Schema Field:** Added the missing `requestedAt` field to `FAQConversionRequest.model.js` to enable creation timestamping and sorting.
 * **Qdrant Vector indexing:** Linked Qdrant synchronization into `approveConversionRequest` so newly approved conversion requests are automatically indexed in Qdrant (with rollback safety). Also populated `requestedBy` to dynamically resolve user roles for notifications.
+
+### 16. Role-Based Highlight Badges and Status Tags
+* **Custom Dynamic Highlighting**:
+  - Status badges for approved/accepted actions dynamically change styling based on the user's role:
+    - **Moderator actions** (Accepted/Approved by a moderator) display a **blue status tag** (`badge-info`) and a **blue "moderator" badge**.
+    - **Admin/Senior actions** (Accepted/Approved by an Admin/Senior) display a **purple status tag** (`badge-purple`) and a **purple "senior"/"admin" badge**.
+    - **Negative actions (Rejected)** are universally styled in **red (`badge-danger`)**.
+  - Role labels rendered next to answer authors have been updated inline to match the blue (moderator) and purple (senior/admin) highlighted themes.
+* **Backend Role Exposing**:
+  - Modified the backend RTQ controllers to populate the `acceptedBy` field for questions and the `approvedBy` field for answers, exposing roles to the client.
+* **Track Question Status Select Dropdown**:
+  - Adjusted the status select dropdown styling in `TrackQuestionPage.jsx` so that the options and container are color-coded (Resolved as green, Partially Resolved as lite blue, and Unresolved as red).
 
 ---
 
