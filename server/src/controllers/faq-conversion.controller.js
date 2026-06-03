@@ -5,6 +5,7 @@ import Answer from '../models/Answer.model.js';
 import { awardQP } from '../services/qp.service.js';
 import { notifyUser } from '../services/notification.service.js';
 import { QP_RULES } from '../../../shared/constants.js';
+import { syncFAQInsert } from '../services/sync/faq.sync.service.js';
 
 export async function createConversionRequest(req, res) {
   try {
@@ -56,7 +57,7 @@ export async function listConversionRequests(req, res) {
 
 export async function approveConversionRequest(req, res) {
   try {
-    const request = await FAQConversionRequest.findById(req.params.id);
+    const request = await FAQConversionRequest.findById(req.params.id).populate('requestedBy');
     if (!request) return res.status(404).json({ message: 'Request not found' });
     if (request.status !== 'pending') return res.status(400).json({ message: 'Request already processed' });
 
@@ -66,25 +67,36 @@ export async function approveConversionRequest(req, res) {
     const answerToUse = request.suggestedAnswer || request.rtqAnswer;
     if (!answerToUse) return res.status(400).json({ message: 'No answer available for FAQ conversion' });
 
+    const requesterId = request.requestedBy?._id || request.requestedBy;
+    const requesterRole = request.requestedBy?.role || 'student';
+
     const faq = await FAQ.create({
       question: request.rtqQuestion,
       answer: answerToUse,
       category: rtq.category,
       tags: rtq.tags,
-      createdBy: request.requestedBy
+      createdBy: requesterId
     });
+
+    try {
+      await syncFAQInsert(faq);
+    } catch (vecErr) {
+      console.error(`[FAQ-Conversion-Controller] Qdrant sync failed for FAQ ${faq._id} — rolling back MongoDB`);
+      await FAQ.findByIdAndDelete(faq._id);
+      return res.status(500).json({ message: 'Failed to index FAQ in vector store', error: vecErr.message });
+    }
 
     request.status = 'approved';
     request.reviewedAt = new Date();
     request.reviewedBy = req.user._id;
     await request.save();
 
-    await awardQP(request.requestedBy, QP_RULES.QUESTION_ADDED_TO_FAQ,
+    await awardQP(requesterId, QP_RULES.QUESTION_ADDED_TO_FAQ,
       'FAQ conversion request approved', faq._id);
     await awardQP(req.user._id, QP_RULES.SENIOR_CONVERT_RTQ_TO_FAQ,
       'Approved FAQ conversion request', faq._id);
 
-    await notifyUser(request.requestedBy, 'student',
+    await notifyUser(requesterId, requesterRole,
       'faq_conversion_approved',
       `Your FAQ conversion request was approved. +${QP_RULES.QUESTION_ADDED_TO_FAQ} QP`,
       QP_RULES.QUESTION_ADDED_TO_FAQ, faq._id);
@@ -99,9 +111,12 @@ export async function approveConversionRequest(req, res) {
 export async function rejectConversionRequest(req, res) {
   try {
     const { adminNote } = req.body;
-    const request = await FAQConversionRequest.findById(req.params.id);
+    const request = await FAQConversionRequest.findById(req.params.id).populate('requestedBy');
     if (!request) return res.status(404).json({ message: 'Request not found' });
     if (request.status !== 'pending') return res.status(400).json({ message: 'Request already processed' });
+
+    const requesterId = request.requestedBy?._id || request.requestedBy;
+    const requesterRole = request.requestedBy?.role || 'student';
 
     request.status = 'rejected';
     request.reviewedAt = new Date();
@@ -109,7 +124,7 @@ export async function rejectConversionRequest(req, res) {
     request.adminNote = adminNote || null;
     await request.save();
 
-    await notifyUser(request.requestedBy, 'student',
+    await notifyUser(requesterId, requesterRole,
       'faq_conversion_rejected',
       `Your FAQ conversion request was rejected.${adminNote ? ` Note: ${adminNote}` : ''}`,
       0, request.rtqId);

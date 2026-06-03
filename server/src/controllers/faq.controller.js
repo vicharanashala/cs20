@@ -155,7 +155,7 @@ export async function markFAQForReview(req, res) {
   try {
     const faq = await FAQ.findById(req.params.id);
     if (!faq) return res.status(404).json({ message: 'FAQ not found' });
-    faq.markedForReview = true;
+    faq.markedForReview = !faq.markedForReview;
     await faq.save();
     try {
       await syncFAQUpdate(req.params.id, faq);

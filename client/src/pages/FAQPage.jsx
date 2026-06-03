@@ -6,7 +6,7 @@ import { useQP } from '../context/QPContext';
 import UpvoteButton from '../components/UpvoteButton';
 import { FAQ_CATEGORIES } from '../utils/constants';
 import { timeAgo } from '../utils/helpers';
-import { ArrowBigUp, Settings } from 'lucide-react';
+import { ArrowBigUp, Settings, Check, X, BookOpen } from 'lucide-react';
 import { cn } from '../utils/helpers';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import BackToTop from '../components/BackToTop';
@@ -14,6 +14,10 @@ import Breadcrumb from '../components/Breadcrumb';
 import { StatusBadge } from '../components/Badge';
 
 export default function FAQPage() {
+  const { user } = useAuth();
+  const isSenior = user?.role === 'senior' || user?.role === 'admin';
+  const isModeratorOrAbove = user && ['moderator', 'senior', 'admin'].includes(user.role);
+
   const [grouped, setGrouped] = useState({});
   const [categories, setCategories] = useState([]);
   const [rankedCategories, setRankedCategories] = useState([]);
@@ -24,8 +28,11 @@ export default function FAQPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [activeFAQSettingsId, setActiveFAQSettingsId] = useState(null);
+
+  const [faqRequests, setFaqRequests] = useState([]);
+  const [faqRequestsLoading, setFaqRequestsLoading] = useState(false);
+  const [faqRequestsExpanded, setFaqRequestsExpanded] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { refreshQP } = useQP();
   const limit = 30;
 
@@ -64,6 +71,44 @@ export default function FAQPage() {
       setLoading(false);
     }
   };
+
+  const loadFAQRequests = async () => {
+    setFaqRequestsLoading(true);
+    try {
+      const data = await faqService.listConversionRequests('pending');
+      setFaqRequests(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setFaqRequestsLoading(false);
+    }
+  };
+
+  const handleApproveFaqConversion = async (requestId) => {
+    if (!confirm('Approve this FAQ conversion? The FAQ will be created.')) return;
+    try {
+      await faqService.approveConversionRequest(requestId);
+      loadFAQRequests();
+      loadFAQs(page);
+    } catch (err) {
+      alert(err.message || 'Failed to approve conversion request');
+    }
+  };
+
+  const handleRejectFaqConversion = async (requestId, adminNote) => {
+    try {
+      await faqService.rejectConversionRequest(requestId, adminNote);
+      loadFAQRequests();
+    } catch (err) {
+      alert(err.message || 'Failed to reject conversion request');
+    }
+  };
+
+  useEffect(() => {
+    if (isSenior) {
+      loadFAQRequests();
+    }
+  }, [isSenior]);
 
   useEffect(() => { setPage(1); loadFAQs(1); }, [selectedCategory, sort]);
   useEffect(() => { loadFAQs(page); }, [page]);
@@ -194,9 +239,6 @@ export default function FAQPage() {
     return rankedCategories.find(c => c.categoryName === categoryName) || { upvotes: 0, hasUpvoted: false };
   };
 
-  const isSenior = user?.role === 'senior' || user?.role === 'admin';
-  const isModeratorOrAbove = user && ['moderator', 'senior', 'admin'].includes(user.role);
-
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       <Breadcrumb items={[{ label: 'FAQs' }]} />
@@ -209,6 +251,77 @@ export default function FAQPage() {
           <Link to="/add-faq" className="btn-primary">+ Add FAQ</Link>
         )}
       </div>
+
+      {isSenior && faqRequests.length > 0 && (
+        <div className="card p-5 mb-6 border-blue-100 bg-blue-50/20">
+          <div
+            className="flex items-center justify-between cursor-pointer"
+            onClick={() => setFaqRequestsExpanded(!faqRequestsExpanded)}
+          >
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-blue-600 animate-pulse" />
+              <h3 className="font-bold text-primary">Pending FAQ Conversion Requests</h3>
+              <span className="bg-blue-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
+                {faqRequests.length}
+              </span>
+            </div>
+            <span className="text-xs font-semibold text-blue-600 hover:underline">
+              {faqRequestsExpanded ? 'Collapse' : 'Expand'}
+            </span>
+          </div>
+
+          {faqRequestsExpanded && (
+            <div className="mt-4 space-y-4 max-h-96 overflow-y-auto pr-1">
+              {faqRequests.map((req) => (
+                <div key={req._id} className="card p-4 bg-white border border-slate-100 shadow-sm flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-xs font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full">
+                          {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                        </span>
+                        <span className="text-xs text-muted">by {req.requestedBy?.name || 'Unknown'}</span>
+                        <span className="text-xs text-muted">&middot;</span>
+                        <span className="text-xs text-muted">{timeAgo(req.requestedAt)}</span>
+                      </div>
+                      <h4 className="font-semibold text-primary text-sm mb-1">{req.rtqQuestion}</h4>
+                      {req.rtqAnswer && (
+                        <p className="text-xs text-muted mb-1 line-clamp-2">
+                          <span className="font-medium text-primary">Top Answer:</span> {req.rtqAnswer}
+                        </p>
+                      )}
+                      {req.suggestedAnswer && (
+                        <p className="text-xs text-blue-600 font-medium line-clamp-2">
+                          <span className="font-semibold text-blue-700">Suggested Answer:</span> {req.suggestedAnswer}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => handleApproveFaqConversion(req._id)}
+                        className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        title="Approve Request"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const note = prompt('Rejection note (optional):');
+                          if (note !== null) handleRejectFaqConversion(req._id, note);
+                        }}
+                        className="p-2 border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
+                        title="Reject Request"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-3 mb-6">
         <input
@@ -293,21 +406,15 @@ export default function FAQPage() {
                                 </button>
                                 {activeFAQSettingsId === faq._id && (
                                   <div className="absolute right-0 mt-1 w-48 bg-white border border-border rounded-lg shadow-lg z-20 py-1">
-                                    {!faq.markedForReview ? (
-                                      <button
-                                        onClick={() => {
-                                          handleReviewFAQ(faq._id);
-                                          setActiveFAQSettingsId(null);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-xs text-amber-600 hover:bg-amber-50 font-semibold flex items-center gap-1.5"
-                                      >
-                                        ⚠️ Flag for Review
-                                      </button>
-                                    ) : (
-                                      <div className="px-3 py-2 text-xs text-muted italic flex items-center gap-1.5 border-b border-border">
-                                        <StatusBadge status="markedForReview" />
-                                      </div>
-                                    )}
+                                    <button
+                                      onClick={() => {
+                                        handleReviewFAQ(faq._id);
+                                        setActiveFAQSettingsId(null);
+                                      }}
+                                      className="w-full text-left px-3 py-2 text-xs text-amber-600 hover:bg-amber-50 font-semibold flex items-center gap-1.5"
+                                    >
+                                      ⚠️ {faq.markedForReview ? 'Remove Flag' : 'Flag for Review'}
+                                    </button>
                                     <button
                                       onClick={() => {
                                         handleToggleTrendingFAQ(faq._id);

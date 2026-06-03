@@ -1,6 +1,6 @@
 # CONTEXT.md — PippaQ Project Context
 
-> Last updated: 2026-06-02 | Dashboard Role Badges, Multi-Moderator RTQ Moderation, Decision Transitions, FAQ Settings Menu, PippaQ branding
+> Last updated: 2026-06-03 | Leaderboard Layout Toggles, FAQ Requests Relocation to FAQ page, Qdrant Sync for FAQ requests, requestedAt timestamping, Client TypeErrors Fixed, Role-Based Tag Highlighting and Status Colors
 
 ---
 
@@ -192,6 +192,60 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
 * **FAQ Page Moderator Actions (Settings Dropdown Menu)**:
   - Refactored `FAQPage.jsx` to render a small Lucide `Settings` gear icon button for moderator actions on any FAQ card, hidden completely from student users.
   - Clicking this gear opens a premium popover dropdown menu containing `Flag for Review` (if not reviewed yet), `Set on Trending` / `Remove Trending` (which toggles trending status via `PATCH /faq/toggle-trending/:id`), and senior's `Edit FAQ` and `Delete FAQ` actions.
+
+### 11. Controlled Senior "Add to FAQ" Workflow & Bidirectional Traceability
+* **Bidirectional Mapping**: 
+  - Added reference field `faqId` on the `RTQ` model and reference field `rtqId` on the `FAQ` model, guaranteeing 100% bi-directional traceability between original resolved questions and approved FAQ entries.
+* **Smart Frontend Auto-Selection**:
+  - Expanding an RTQ card executes a local 4-tier selection priority scheme to pre-select the best answer:
+    1. Senior's own answer (highest priority).
+    2. Senior-approved answer.
+    3. Moderator-approved answer.
+    4. Fallback to the highest upvoted answer.
+* **Review Edit Modal Panel**:
+  - Replaced immediate RTQ → FAQ conversion with a multi-step popup modal. When a Senior clicks `"Add to FAQ (Initiate)"`, it opens the panel pre-filled with the auto-selected answer, category, and tags.
+  - Seniors have full editorial control to modify the answer, choose a standardized category from a dropdown, and customize comma-separated tags before confirming.
+* **Traceable Creation Endpoint**:
+  - `convertToFAQ` controller parses custom body payloads (`answerId`, `answer`, `category`, `tags`), links documents, resolves original RTQ status to accepted, awards `+10 QP` to the Senior, awards `+10 QP` to the student answerer, and prevents duplicate conversions via `rtq.faqId` checks.
+
+### 12. Senior Personal Working History
+* **Personal Audit Trail**:
+  - Upgraded the working history backend `listRTQs` to support `filter === 'history'`.
+  - Queries `FAQ` entries created by the currently authenticated Senior (`req.user._id`) that originated from an RTQ (`rtqId` present) and lists only those original RTQs.
+  - The `WorkingHistoryPage` now acts as a dedicated personal work history listing for the active Senior.
+
+### 13. Git Merge Resolution & Alignment
+* **Unified Moderation Gear Panel**:
+  - Integrated features from `origin/main` and unified the settings gear moderation actions in [RTQPage.jsx](file:///d:/FAQs/FAQ/client/src/pages/RTQPage.jsx) and [RTQDetailPage.jsx](file:///d:/FAQs/FAQ/client/src/pages/RTQDetailPage.jsx).
+  - Standard moderators see the "Request FAQ Conversion" button (`FileText` icon) under the gear.
+  - Seniors & Admins see ONLY the permanent remove (`Trash2` icon) button under the gear, keeping the controlled `Add to FAQ (Initiate)` review modal workflow triggered only from the card bottom/expanded views.
+  - Owners see the `Mark as Resolved` (`Check` icon) button.
+* **Vite CSS Import Warning Cleaned**:
+  - Reordered the font `@import` declaration in [index.css](file:///d:/FAQs/FAQ/client/src/index.css) to precede all `@tailwind` statements, ensuring a completely clean product build output with zero warnings or errors.
+
+### 14. Leaderboard Segmented Toggle & Tier Renames
+* **Peers & Seniors Separation:** Partitioned the user lists on the Leaderboard page (`UserListPage.jsx`) into **Peers** (Student/Moderator) and **Seniors** (Senior/Admin).
+* **Segmented Toggle Group:** Added a modern tab-like button switcher group at the top of the user list. Privilege-holders (Seniors/Admins) can toggle between the "Peers" list and "Seniors" list. Non-privileged users (Students/Moderators) only see the "Peers" list.
+* **Independent Ranking Tracks:** Refactored rankings so each tier runs its own leaderboard starting at rank #1, awarding Crown and Trophy badges to top performers in both groups.
+
+### 15. FAQ Conversion Requests Fixes & FAQ Page Relocation
+* **Client Service Alignment:** Fixed TypeError crashes in `RTQPage.jsx` and `RTQDetailPage.jsx` by updating legacy `rtqService.requestConversion` calls to `faqService.requestConversion`.
+* **Section Relocation:** Shifted the FAQ conversion request review list from the Users page to a collapsible dashboard at the top of the main `FAQPage.jsx` view.
+* **Role Expansion:** Updated backend routing (`faq.routes.js`) to grant permissions to the `'senior'` role for listing, approving, and rejecting FAQ requests, in addition to `'admin'`.
+* **Database Schema Field:** Added the missing `requestedAt` field to `FAQConversionRequest.model.js` to enable creation timestamping and sorting.
+* **Qdrant Vector indexing:** Linked Qdrant synchronization into `approveConversionRequest` so newly approved conversion requests are automatically indexed in Qdrant (with rollback safety). Also populated `requestedBy` to dynamically resolve user roles for notifications.
+
+### 16. Role-Based Highlight Badges and Status Tags
+* **Custom Dynamic Highlighting**:
+  - Status badges for approved/accepted actions dynamically change styling based on the user's role:
+    - **Moderator actions** (Accepted/Approved by a moderator) display a **blue status tag** (`badge-info`) and a **blue "moderator" badge**.
+    - **Admin/Senior actions** (Accepted/Approved by an Admin/Senior) display a **purple status tag** (`badge-purple`) and a **purple "senior"/"admin" badge**.
+    - **Negative actions (Rejected)** are universally styled in **red (`badge-danger`)**.
+  - Role labels rendered next to answer authors have been updated inline to match the blue (moderator) and purple (senior/admin) highlighted themes.
+* **Backend Role Exposing**:
+  - Modified the backend RTQ controllers to populate the `acceptedBy` field for questions and the `approvedBy` field for answers, exposing roles to the client.
+* **Track Question Status Select Dropdown**:
+  - Adjusted the status select dropdown styling in `TrackQuestionPage.jsx` so that the options and container are color-coded (Resolved as green, Partially Resolved as lite blue, and Unresolved as red).
 
 ---
 

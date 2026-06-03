@@ -23,6 +23,10 @@ const faqConversionRequestSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  requestedAt: {
+    type: Date,
+    default: Date.now
+  },
   status: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],

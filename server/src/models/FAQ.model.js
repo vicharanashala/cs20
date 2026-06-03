@@ -8,6 +8,7 @@ const faqSchema = new mongoose.Schema({
   upvotes: { type: Number, default: 0 },
   upvotedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  rtqId: { type: mongoose.Schema.Types.ObjectId, ref: 'RTQ' },
   vectorEmbedding: [{ type: Number }],
   isTrending: { type: Boolean, default: false },
   markedForReview: { type: Boolean, default: false },

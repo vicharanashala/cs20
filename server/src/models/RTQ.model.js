@@ -11,6 +11,7 @@ const rtqSchema = new mongoose.Schema({
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   vectorEmbedding: [{ type: Number }],
   approvedAnswer: { type: mongoose.Schema.Types.ObjectId, ref: 'Answer' },
+  faqId: { type: mongoose.Schema.Types.ObjectId, ref: 'FAQ' },
   isAccepted: { type: Boolean, default: false },
   acceptedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   rejectedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
