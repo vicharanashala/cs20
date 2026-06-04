@@ -4,11 +4,13 @@ import rtqService from '../services/rtq.service';
 import ragService from '../services/rag.service';
 import { FAQ_CATEGORIES } from '../utils/constants';
 import Breadcrumb from '../components/Breadcrumb';
+import { Search, AlertCircle, HelpCircle, Sparkles, Tag, Layers, CheckCircle2, ArrowRight } from 'lucide-react';
 
 export default function RaiseQuestionPage() {
   const [form, setForm] = useState({ question: '', category: '', tags: '' });
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [evaluating, setEvaluating] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
@@ -20,11 +22,15 @@ export default function RaiseQuestionPage() {
 
   const handleEvaluate = async () => {
     if (!form.question) return;
+    setEvaluating(true);
+    setError('');
     try {
       const result = await ragService.evaluateQuestion({ question: form.question });
       setPreview(result);
     } catch (err) {
       setError('Failed to evaluate question');
+    } finally {
+      setEvaluating(false);
     }
   };
 
@@ -35,7 +41,6 @@ export default function RaiseQuestionPage() {
     try {
       const tags = form.tags.split(',').map(t => t.trim()).filter(Boolean);
       const res = await rtqService.submitQuestion({ ...form, tags });
-      // FIX #18: RAG returns 'REJECT' or 'ACCEPT', never 'FAQ_MATCH'
       if (res.status === 'REJECT') {
         setPreview(res);
         const penaltyMsg = res.penalty < 0 ? ` ${res.penalty} QP penalty applied.` : '';
@@ -51,97 +56,161 @@ export default function RaiseQuestionPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="page-container max-w-2xl">
       <Breadcrumb items={[{ label: 'RTQ', to: '/rtq' }, { label: 'Ask a Question' }]} />
-      <h1 className="text-2xl font-bold text-primary mb-6">Raise a Question</h1>
-      <div className="card p-6">
-        <form onSubmit={handleSubmit} className="space-y-5">
+      
+      {/* Header section */}
+      <div className="mb-8">
+        <h1 className="page-title flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-violet-600 flex items-center justify-center shadow-md shadow-accent/10">
+            <HelpCircle className="w-5 h-5 text-white" />
+          </div>
+          Ask a Question
+        </h1>
+        <p className="page-subtitle mt-1">
+          Submit a new question to the Senior/Admin community. Please check for duplicates first to save Quality Points!
+        </p>
+      </div>
+
+      <div className="card shadow-premium border border-border/50 bg-white/90 backdrop-blur-md p-6 sm:p-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {error && !preview && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-              {error}
+            <div className="flex items-start gap-2.5 p-4 rounded-xl border border-red-200/60 bg-red-50/40 text-red-800 text-sm animate-slideDown">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
           {preview?.status === 'REJECT' && (
-            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm space-y-2">
-              <div className="flex items-start justify-between">
-                <p className="font-medium">Question rejected: {preview.reason}</p>
+            <div className="flex flex-col gap-3 p-4 rounded-xl border border-amber-200 bg-amber-50/40 text-amber-800 text-sm animate-slideDown">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-amber-900 leading-tight">Duplicate Question Found</p>
+                    <p className="text-xs text-amber-700 mt-1">{preview.reason}</p>
+                  </div>
+                </div>
                 {preview.penalty < 0 && (
-                  <span className="text-xs text-red-600 font-medium">{preview.penalty} QP</span>
+                  <span className="text-xs font-bold px-2 py-0.5 bg-red-100 text-red-700 rounded-md shrink-0">
+                    {preview.penalty} QP Penalty
+                  </span>
                 )}
               </div>
+
               {preview.matchedFAQ && (
-                <div className="text-xs space-y-1">
-                  <p className="text-yellow-700">Similar FAQ found:</p>
-                  <p className="font-medium text-yellow-900">"{preview.matchedFAQ.question}"</p>
-                  <p className="text-yellow-600">
-                    FAQ similarity: {(preview.faqScore * 100).toFixed(1)}%
-                    {preview.rtqScore !== undefined && ` · RTQ similarity: ${(preview.rtqScore * 100).toFixed(1)}%`}
-                  </p>
+                <div className="bg-white/80 border border-amber-200/50 rounded-lg p-3 text-xs space-y-2 mt-1">
+                  <div className="flex items-center gap-1.5 text-amber-700 font-semibold">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Highly similar FAQ Match ({(preview.faqScore * 100).toFixed(0)}%):</span>
+                  </div>
+                  <p className="font-medium text-slate-800 italic">"{preview.matchedFAQ.question}"</p>
                   {preview.matchedRTQ && (
-                    <p className="text-yellow-700 mt-1">Similar open question: "{preview.matchedRTQ.question}"</p>
+                    <div className="pt-2 border-t border-slate-100">
+                      <p className="text-amber-700 font-semibold">Similar Open Question:</p>
+                      <p className="font-medium text-slate-800 italic">"{preview.matchedRTQ.question}"</p>
+                    </div>
                   )}
                 </div>
               )}
+
               <button
                 type="button"
                 onClick={() => setPreview(null)}
-                className="text-xs text-yellow-700 hover:text-yellow-900 underline"
+                className="text-xs text-amber-700 hover:text-amber-900 underline font-semibold mt-1 self-start"
               >
-                Dismiss
+                Dismiss Warning
               </button>
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1.5">Your Question</label>
+          {preview?.status === 'ACCEPT' && (
+            <div className="flex items-start gap-2.5 p-4 rounded-xl border border-emerald-200 bg-emerald-50/30 text-emerald-800 text-sm animate-slideDown">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-emerald-900 leading-tight">No duplicates detected!</p>
+                <p className="text-xs text-emerald-700 mt-1">
+                  Your question seems unique. You're ready to submit it!
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Question Text Area */}
+          <div className="flex flex-col">
+            <label className="text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              <HelpCircle className="w-4 h-4 text-slate-400" />
+              Describe your Question
+            </label>
             <textarea
               name="question"
               value={form.question}
               onChange={handleChange}
-              className="input resize-none"
+              className="w-full border border-border/70 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent bg-white/50 backdrop-blur-sm transition-all resize-none shadow-sm placeholder:text-muted/40"
               rows={4}
-              placeholder="Describe your question clearly..."
+              placeholder="What would you like to ask the mentors?"
               required
             />
             <button
               type="button"
               onClick={handleEvaluate}
-              className="mt-2 text-sm text-primary font-medium hover:underline"
-              disabled={!form.question}
+              disabled={!form.question || evaluating}
+              className="mt-2.5 self-start text-xs font-bold text-accent hover:text-accent-700 hover:underline flex items-center gap-1 disabled:opacity-40 disabled:no-underline transition-colors"
             >
-              🔍 Check for duplicates first
+              <Search className="w-3.5 h-3.5" />
+              {evaluating ? 'Analyzing question...' : 'Scan for similar questions first'}
             </button>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1.5">Category</label>
+
+          {/* Category Dropdown */}
+          <div className="flex flex-col">
+            <label className="text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-slate-400" />
+              Category
+            </label>
             <select
               name="category"
               value={form.category}
               onChange={handleChange}
-              className="input"
+              className="w-full border border-border/70 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent bg-white/50 backdrop-blur-sm transition-all shadow-sm cursor-pointer"
               required
             >
               <option value="">Select a category</option>
               {FAQ_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-primary mb-1.5">Tags (comma-separated)</label>
+
+          {/* Tags Input */}
+          <div className="flex flex-col">
+            <label className="text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+              <Tag className="w-4 h-4 text-slate-400" />
+              Tags <span className="text-xs text-muted font-normal">(comma-separated)</span>
+            </label>
             <input
               type="text"
               name="tags"
               value={form.tags}
               onChange={handleChange}
-              className="input"
-              placeholder="javascript, async, promise"
+              className="w-full border border-border/70 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent bg-white/50 backdrop-blur-sm transition-all shadow-sm placeholder:text-muted/40"
+              placeholder="e.g. javascript, certificate, rosetta"
             />
           </div>
-          <div className="flex gap-3">
-            <button type="submit" disabled={loading} className="btn-primary">
+
+          {/* Actions */}
+          <div className="flex items-center gap-3 pt-4 border-t border-border/40">
+            <button
+              type="submit"
+              disabled={loading || evaluating}
+              className="btn-gradient flex items-center gap-1.5"
+            >
               {loading ? 'Submitting...' : 'Submit Question'}
+              <ArrowRight className="w-4 h-4" />
             </button>
-            <button type="button" onClick={() => navigate('/rtq')} className="btn-secondary">
+            <button
+              type="button"
+              onClick={() => navigate('/rtq')}
+              className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+            >
               Cancel
             </button>
           </div>

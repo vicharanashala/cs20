@@ -1,6 +1,6 @@
 # CONTEXT.md — PippaQ Project Context
 
-> Last updated: 2026-06-03 | Leaderboard Layout Toggles, FAQ Requests Relocation to FAQ page, Qdrant Sync for FAQ requests, requestedAt timestamping, Client TypeErrors Fixed, Role-Based Tag Highlighting and Status Colors
+> Last updated: 2026-06-04 | About Page Symbolism Icons, Directed Release Animations, Card Hover Clipping Fix, and Q-Card Text Overflow Resolution
 
 ---
 
@@ -246,6 +246,13 @@ Implemented a new service [autoupvote.service.js](file:///d:/FAQs/FAQ/server/src
   - Modified the backend RTQ controllers to populate the `acceptedBy` field for questions and the `approvedBy` field for answers, exposing roles to the client.
 * **Track Question Status Select Dropdown**:
   - Adjusted the status select dropdown styling in `TrackQuestionPage.jsx` so that the options and container are color-coded (Resolved as green, Partially Resolved as lite blue, and Unresolved as red).
+
+### 17. About Page Interactive Logo Symbolism & Styling Refinements
+* **Refined Symbol Icons**: Replaced the diamond symbol for Vṛtta with a circle symbol (SVG + label), and the leaf symbol for Jaṭā with a custom waving SVG representing the matted hair of a sage.
+* **Directed Release Animations**: Added CSS keyframe animations releasing streams of colored circles (blue, green, orange) from the center logo that travel directly toward their respective pointed cards on hover.
+* **Hotspot Symmetrical Pulsing**: Fixed standard ping animations on hotspots by using inline `transformOrigin` styles to make them pulse symmetrically in-place.
+* **Cropping & Layout Resolution**: Expanded all SVG `<foreignObject>` container dimensions (e.g., 310x180, 240x240, 500x130) and centered cards inside using custom margins to prevent box-shadow and hover transformations from clipping.
+* **Text Overflow Resolution**: Increased the Q Symbol highlight statement card to `height: 92px` (and its `<foreignObject>` to `height: 135px`) to fully fit the paragraph text without letting the last word overflow the bottom border.
 
 ---
 

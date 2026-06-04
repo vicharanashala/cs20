@@ -13,11 +13,42 @@ async function recordTransaction(userId, type, amount, reason, referenceId = nul
 
   const updated = await User.findById(userId);
 
-  // FIX #13: Check auto-promotion after every QP award
+  const qpImpact = type === 'earn' ? positiveAmount : -positiveAmount;
+  await notifyUser(
+    userId, updated.role, type === 'earn' ? 'qp_earned' : 'qp_deducted',
+    reason, qpImpact, referenceId
+  );
+
   if (type === 'earn' && updated.role === 'student' && updated.qp >= QP_THRESHOLDS.AUTO_PROMOTE_MODERATOR) {
     await notifyUser(
       userId, 'student', 'promotion_eligible',
-      `You have reached ${updated.qp} QP and are eligible for Moderator promotion!`,
+      `You have reached ${updated.qp} QP and are eligible for Moderator promotion! Request sent to admins.`,
+      0, userId
+    );
+    const admins = await User.find({ role: 'admin' }).select('_id');
+    for (const admin of admins) {
+      await notifyUser(
+        admin._id, 'admin', 'promotion_request',
+        `Student ${updated.name} (@${updated.username}) has reached ${updated.qp} QP and is eligible for Moderator promotion.`,
+        0, userId
+      );
+    }
+  }
+
+  if (updated.qp < QP_THRESHOLDS.MIN_TO_ASK_QUESTION && !updated.restrictedAt) {
+    await User.findByIdAndUpdate(userId, { restrictedAt: new Date() });
+    await notifyUser(
+      userId, updated.role, 'account_restricted',
+      `Your account has been restricted because QP (${updated.qp}) is below ${QP_THRESHOLDS.MIN_TO_ASK_QUESTION}. Contact an admin for review.`,
+      0, userId
+    );
+  }
+
+  if (updated.qp >= QP_THRESHOLDS.MIN_TO_ASK_QUESTION && updated.restrictedAt) {
+    await User.findByIdAndUpdate(userId, { restrictedAt: null });
+    await notifyUser(
+      userId, updated.role, 'account_unrestricted',
+      `Your account has been unrestricted - QP is now ${updated.qp}. You can ask questions again.`,
       0, userId
     );
   }

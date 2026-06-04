@@ -5,6 +5,7 @@ import EmailWhitelist from '../models/EmailWhitelist.model.js';
 import AccessRequest from '../models/AccessRequest.model.js';
 import { config } from '../config/env.js';
 import logger from '../utils/logger.js';
+import { awardQP } from './qp.service.js';
 
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -116,6 +117,7 @@ export async function verifyOTP(userId, otp) {
   user.emailOtp = undefined;
   user.emailOtpExpires = undefined;
   await user.save();
+  await awardQP(user._id, 100, 'Welcome bonus - Account activated');
   return { user };
 }
 
@@ -138,5 +140,6 @@ export async function loginUser(email, password) {
 }
 
 export async function getMe(userId) {
-  return await User.findById(userId);
+  const user = await User.findById(userId);
+  return user ? user.toJSON() : null;
 }

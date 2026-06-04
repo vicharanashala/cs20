@@ -4,7 +4,7 @@ import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-router.get('/ranked', authenticate, listCategoriesWithUpvotes);
+router.get('/ranked', listCategoriesWithUpvotes);
 router.post('/upvote/:categoryName', authenticate, upvoteCategory);
 
 export default router;

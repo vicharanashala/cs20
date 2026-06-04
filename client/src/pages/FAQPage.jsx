@@ -1,153 +1,126 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import faqService from '../services/faq.service';
 import { useAuth } from '../context/AuthContext';
 import { useQP } from '../context/QPContext';
 import UpvoteButton from '../components/UpvoteButton';
+import Avatar from '../components/Avatar';
+import EmptyState from '../components/EmptyState';
+import Breadcrumb from '../components/Breadcrumb';
+import BackToTop from '../components/BackToTop';
+import { Spinner } from '../components/SkeletonLoader';
 import { FAQ_CATEGORIES } from '../utils/constants';
 import { timeAgo } from '../utils/helpers';
-import { ArrowBigUp, Settings, Check, X, BookOpen } from 'lucide-react';
-import { cn } from '../utils/helpers';
-import { SkeletonCard } from '../components/SkeletonLoader';
-import BackToTop from '../components/BackToTop';
-import Breadcrumb from '../components/Breadcrumb';
-import { StatusBadge } from '../components/Badge';
+import { Search, BookOpen, Pencil, Trash2, ChevronDown, ChevronUp, Plus, SlidersHorizontal, Eye, Flag, ChevronLeft, ChevronRight, TrendingUp as TrendingIcon, ArrowBigUp } from 'lucide-react';
+import LoginModal from '../components/LoginModal';
+
+const categoryIcons = {
+  'About the internship': '🎓',
+  'Timing and dates': '📅',
+  'NOC (No Objection Certificate)': '📝',
+  'Selection, offer letter, and certificate': '✉️',
+  'Work, mentorship, and projects': '💻',
+  'Code of conduct - communication channels': '💬',
+  'Interviews Related': '🤝',
+  'Certificate': '📜',
+  'Rosetta - your internship journal': '📓',
+  'General': '🌐'
+};
 
 export default function FAQPage() {
   const { user } = useAuth();
-  const isSenior = user?.role === 'senior' || user?.role === 'admin';
+  const { refreshQP } = useQP();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [faqs, setFaqs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState(searchParams.get('q') || '');
+  const [category, setCategory] = useState(searchParams.get('category') || '');
+  const [sort, setSort] = useState(searchParams.get('sort') || 'upvotes');
+  const [reviewOnTop, setReviewOnTop] = useState(false);
+  const [page, setPage] = useState(Number(searchParams.get('page')) || 1);
+  const [total, setTotal] = useState(0);
+  const [expandedId, setExpandedId] = useState(null);
+  const [conversionRequests, setConversionRequests] = useState([]);
+  const [rankedCategories, setRankedCategories] = useState([]);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const limit = 15;
+
+  const scrollRef = useRef(null);
+  const scroll = (direction) => {
+    if (scrollRef.current) {
+      const { scrollLeft, clientWidth } = scrollRef.current;
+      const scrollTo = direction === 'left' 
+        ? scrollLeft - clientWidth * 0.6 
+        : scrollLeft + clientWidth * 0.6;
+      scrollRef.current.scrollTo({ left: scrollTo, behavior: 'smooth' });
+    }
+  };
+
+  const isSeniorOrAdmin = user && ['senior', 'admin'].includes(user.role);
   const isModeratorOrAbove = user && ['moderator', 'senior', 'admin'].includes(user.role);
 
-  const [grouped, setGrouped] = useState({});
-  const [categories, setCategories] = useState([]);
-  const [rankedCategories, setRankedCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('upvotes');
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [activeFAQSettingsId, setActiveFAQSettingsId] = useState(null);
-
-  const [faqRequests, setFaqRequests] = useState([]);
-  const [faqRequestsLoading, setFaqRequestsLoading] = useState(false);
-  const [faqRequestsExpanded, setFaqRequestsExpanded] = useState(false);
-  const navigate = useNavigate();
-  const { refreshQP } = useQP();
-  const limit = 30;
-
-  const loadFAQs = async (pageNum = 1) => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const sortMap = { upvotes: 'upvotes', newest: 'createdAt', oldest: 'createdAt' };
-      const sortDir = { upvotes: -1, newest: -1, oldest: 1 };
-      const [faqRes, rankedRes] = await Promise.all([
-        faqService.list({ sort: sortMap[sort], sortDir: sortDir[sort], category: selectedCategory !== 'all' ? selectedCategory : undefined, page: pageNum, limit }),
-        faqService.listCategoriesRanked(),
+      const params = { page, limit, sort };
+      if (search) params.search = search;
+      if (category) params.category = category;
+      const [faqData, rankedData] = await Promise.all([
+        faqService.list(params),
+        faqService.listCategoriesRanked().catch(() => [])
       ]);
-      // Normalize grouped keys: strip numeric prefixes and normalize dashes/spaces (e.g. "9. Rosetta — your internship journal" → "Rosetta - your internship journal")
-      const normalizedGrouped = {};
-      for (const [key, value] of Object.entries(faqRes.grouped)) {
-        let normKey = key.replace(/^\d+\.\s*/, '').trim();
-        // Replace em-dashes (—) or en-dashes (–) with normal hyphens (-)
-        normKey = normKey.replace(/[\u2010-\u2015\u2212]/g, '-');
-        // Standardize spacing around hyphens: replace " - " or "  -  " etc. with " - "
-        normKey = normKey.replace(/\s*-\s*/g, ' - ');
-        
-        normalizedGrouped[normKey] = normalizedGrouped[normKey]
-          ? [...normalizedGrouped[normKey], ...value]
-          : value;
-      }
-      setGrouped(normalizedGrouped);
-      setCategories(faqRes.categories);
-      setRankedCategories(rankedRes);
-      if (faqRes.pagination) {
-        setTotal(faqRes.pagination.total);
-        setPage(pageNum);
-      }
+      setFaqs(faqData.faqs || []);
+      setTotal(faqData.pagination?.total || 0);
+      setRankedCategories(rankedData || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, sort, category, search]);
 
-  const loadFAQRequests = async () => {
-    setFaqRequestsLoading(true);
-    try {
-      const data = await faqService.listConversionRequests('pending');
-      setFaqRequests(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setFaqRequestsLoading(false);
-    }
-  };
-
-  const handleApproveFaqConversion = async (requestId) => {
-    if (!confirm('Approve this FAQ conversion? The FAQ will be created.')) return;
-    try {
-      await faqService.approveConversionRequest(requestId);
-      loadFAQRequests();
-      loadFAQs(page);
-    } catch (err) {
-      alert(err.message || 'Failed to approve conversion request');
-    }
-  };
-
-  const handleRejectFaqConversion = async (requestId, adminNote) => {
-    try {
-      await faqService.rejectConversionRequest(requestId, adminNote);
-      loadFAQRequests();
-    } catch (err) {
-      alert(err.message || 'Failed to reject conversion request');
-    }
-  };
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    if (isSenior) {
-      loadFAQRequests();
+    if (isSeniorOrAdmin) {
+      faqService.getConversionRequests?.()
+        .then(setConversionRequests)
+        .catch(() => {});
     }
-  }, [isSenior]);
+  }, [isSeniorOrAdmin]);
 
-  useEffect(() => { setPage(1); loadFAQs(1); }, [selectedCategory, sort]);
-  useEffect(() => { loadFAQs(page); }, [page]);
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setPage(1);
+    load();
+  };
 
   const handleUpvote = async (faqId) => {
-    const prevGrouped = grouped;
-    setGrouped(prev => {
-      const next = {};
-      for (const [cat, items] of Object.entries(prev)) {
-        next[cat] = items.map(faq => {
-          if (faq._id !== faqId) return faq;
-          const alreadyUpvoted = faq.upvotedBy?.some(id => (id?._id || id)?.toString() === user?._id?.toString());
-          return {
-            ...faq,
-            upvotes: alreadyUpvoted ? Math.max(0, faq.upvotes - 1) : faq.upvotes + 1,
-            upvotedBy: alreadyUpvoted
-              ? faq.upvotedBy.filter(id => (id?._id || id)?.toString() !== user?._id?.toString())
-              : [...(faq.upvotedBy || []), { _id: user._id }]
-          };
-        });
-      }
-      return next;
-    });
-
+    if (!user) { setLoginModalOpen(true); return; }
+    const faq = faqs.find(f => f._id === faqId);
+    const hasUpvoted = faq?.upvotedBy?.some(uid => (uid?._id || uid)?.toString() === user?._id?.toString());
+    setFaqs(prev => prev.map(f => {
+      if (f._id !== faqId) return f;
+      return {
+        ...f,
+        upvotes: hasUpvoted ? f.upvotes - 1 : f.upvotes + 1,
+        upvotedBy: hasUpvoted
+          ? f.upvotedBy.filter(uid => (uid?._id || uid)?.toString() !== user?._id?.toString())
+          : [...(f.upvotedBy || []), user?._id]
+      };
+    }));
     try {
       await faqService.upvote(faqId);
       refreshQP?.();
-    } catch (err) {
-      setGrouped(prevGrouped);
-      console.error(err);
-    }
+    } catch { load(); }
   };
 
   const handleCategoryUpvote = async (categoryName) => {
+    if (!user) { setLoginModalOpen(true); return; }
     const prevRanked = rankedCategories;
-
-    // Optimistic update
     setRankedCategories(prev => {
-      const updated = prev.map(cat => {
+      return prev.map(cat => {
         if (cat.categoryName !== categoryName) return cat;
         const wasUpvoted = cat.hasUpvoted;
         return {
@@ -156,14 +129,7 @@ export default function FAQPage() {
           hasUpvoted: !wasUpvoted,
         };
       });
-      // Re-sort after upvote change
-      updated.sort((a, b) => {
-        if (b.upvotes !== a.upvotes) return b.upvotes - a.upvotes;
-        return new Date(b.lastActivity) - new Date(a.lastActivity);
-      });
-      return updated;
     });
-
     try {
       await faqService.upvoteCategory(categoryName);
     } catch (err) {
@@ -172,330 +138,427 @@ export default function FAQPage() {
     }
   };
 
-  // Use ranked category order for display
-  const sortedCategoryNames = rankedCategories.map(c => c.categoryName);
-
-  const handleDelete = async (faqId) => {
-    if (!confirm('Delete this FAQ? This cannot be undone.')) return;
-    const prevGrouped = grouped;
-    setGrouped(prev => {
-      const next = {};
-      for (const [cat, items] of Object.entries(prev)) {
-        next[cat] = items.filter(faq => faq._id !== faqId);
-      }
-      return next;
-    });
-    try {
-      await faqService.remove(faqId);
-    } catch (err) {
-      setGrouped(prevGrouped);
-      alert(err.message || 'Failed to delete FAQ');
-    }
-  };
-
-  const handleReviewFAQ = async (faqId) => {
-    try {
-      await faqService.reviewFAQ(faqId);
-      loadFAQs(page);
-    } catch (err) {
-      alert(err.message || 'Failed to mark FAQ for review');
-    }
-  };
-
-  const handleToggleTrendingFAQ = async (faqId) => {
-    try {
-      await faqService.toggleTrendingFAQ(faqId);
-      loadFAQs(page);
-    } catch (err) {
-      alert(err.message || 'Failed to update trending status');
-    }
-  };
-  const filteredCategories = selectedCategory === 'all'
-    ? [
-        ...sortedCategoryNames.filter(name => grouped[name]?.length > 0),
-        ...Object.keys(grouped).filter(name => grouped[name]?.length > 0 && !sortedCategoryNames.includes(name))
-      ]
-    : [selectedCategory];
-
-  const searchFiltered = (items) => {
-    if (!search) return items;
-    const q = search.toLowerCase();
-    return items.filter(f => f.question.toLowerCase().includes(q) || f.answer.toLowerCase().includes(q));
-  };
-
-  const sortItems = (items) => {
-    const sorted = [...items];
-    if (sort === 'upvotes') {
-      sorted.sort((a, b) => b.upvotes - a.upvotes);
-    } else if (sort === 'newest') {
-      sorted.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    } else if (sort === 'oldest') {
-      sorted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    }
-    return sorted;
-  };
-
   const getCategoryUpvoteInfo = (categoryName) => {
     return rankedCategories.find(c => c.categoryName === categoryName) || { upvotes: 0, hasUpvoted: false };
   };
 
+  const handleDelete = async (faqId) => {
+    if (!confirm('Delete this FAQ permanently?')) return;
+    const prev = faqs;
+    setFaqs(prev => prev.filter(f => f._id !== faqId));
+    try {
+      await faqService.remove(faqId);
+      refreshQP?.();
+    } catch (err) {
+      setFaqs(prev);
+      alert(err.message || 'Failed to delete FAQ');
+    }
+  };
+
+  const handleToggleTrending = async (faqId) => {
+    const prev = faqs;
+    setFaqs(prev => prev.map(f => f._id === faqId ? { ...f, isTrending: !f.isTrending } : f));
+    try {
+      await faqService.toggleTrendingFAQ(faqId);
+    } catch { setFaqs(prev); }
+  };
+
+  const handleToggleReview = async (faqId) => {
+    const prev = faqs;
+    setFaqs(prev => prev.map(f => f._id === faqId ? { ...f, markedForReview: !f.markedForReview } : f));
+    try {
+      await faqService.reviewFAQ(faqId);
+    } catch { setFaqs(prev); }
+  };
+
+  const totalPages = Math.ceil(total / limit);
+
+  const sortOptions = [
+    { value: 'upvotes', label: 'Most Upvoted' },
+    { value: 'newest', label: 'Newest' },
+    { value: 'oldest', label: 'Oldest' },
+  ];
+
+  // Group FAQs by category
+  const faqsByCategory = {};
+  faqs.forEach(faq => {
+    const cat = faq.category || 'Uncategorized';
+    if (!faqsByCategory[cat]) faqsByCategory[cat] = [];
+    faqsByCategory[cat].push(faq);
+  });
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="page-container">
       <Breadcrumb items={[{ label: 'FAQs' }]} />
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">FAQ Knowledge Base</h1>
-          <p className="text-muted text-sm mt-1">Browse solved questions and answers</p>
-        </div>
-        {isSenior && (
-          <Link to="/add-faq" className="btn-primary">+ Add FAQ</Link>
-        )}
-      </div>
 
-      {isSenior && faqRequests.length > 0 && (
-        <div className="card p-5 mb-6 border-blue-100 bg-blue-50/20">
-          <div
-            className="flex items-center justify-between cursor-pointer"
-            onClick={() => setFaqRequestsExpanded(!faqRequestsExpanded)}
-          >
-            <div className="flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-blue-600 animate-pulse" />
-              <h3 className="font-bold text-primary">Pending FAQ Conversion Requests</h3>
-              <span className="bg-blue-600 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
-                {faqRequests.length}
-              </span>
-            </div>
-            <span className="text-xs font-semibold text-blue-600 hover:underline">
-              {faqRequestsExpanded ? 'Collapse' : 'Expand'}
-            </span>
+      {/* Hero Search Section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="page-title flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-violet-600 flex items-center justify-center">
+                <BookOpen className="w-5 h-5 text-white" />
+              </div>
+              Knowledge Base
+            </h1>
+            <p className="page-subtitle mt-1">
+              {total} FAQs curated by the community
+            </p>
           </div>
+          {isSeniorOrAdmin && (
+            <Link to="/add-faq" className="btn-gradient-sm flex items-center gap-1.5">
+              <Plus className="w-4 h-4" /> Add FAQ
+            </Link>
+          )}
+        </div>
 
-          {faqRequestsExpanded && (
-            <div className="mt-4 space-y-4 max-h-96 overflow-y-auto pr-1">
-              {faqRequests.map((req) => (
-                <div key={req._id} className="card p-4 bg-white border border-slate-100 shadow-sm flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-xs font-semibold px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full">
-                          {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                        </span>
-                        <span className="text-xs text-muted">by {req.requestedBy?.name || 'Unknown'}</span>
-                        <span className="text-xs text-muted">&middot;</span>
-                        <span className="text-xs text-muted">{timeAgo(req.requestedAt)}</span>
-                      </div>
-                      <h4 className="font-semibold text-primary text-sm mb-1">{req.rtqQuestion}</h4>
-                      {req.rtqAnswer && (
-                        <p className="text-xs text-muted mb-1 line-clamp-2">
-                          <span className="font-medium text-primary">Top Answer:</span> {req.rtqAnswer}
-                        </p>
-                      )}
-                      {req.suggestedAnswer && (
-                        <p className="text-xs text-blue-600 font-medium line-clamp-2">
-                          <span className="font-semibold text-blue-700">Suggested Answer:</span> {req.suggestedAnswer}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        onClick={() => handleApproveFaqConversion(req._id)}
-                        className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                        title="Approve Request"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const note = prompt('Rejection note (optional):');
-                          if (note !== null) handleRejectFaqConversion(req._id, note);
-                        }}
-                        className="p-2 border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-                        title="Reject Request"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+        {/* Search Bar */}
+        <form onSubmit={handleSearch} className="relative mb-4">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted/40" />
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search FAQs by question, answer, or tags..."
+            className="w-full border border-border/60 rounded-2xl pl-12 pr-20 py-3.5 text-sm bg-white/80 backdrop-blur-sm
+              placeholder:text-muted/40 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all shadow-card"
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted bg-slate-100 px-2 py-1 rounded-lg font-mono hidden sm:block">/</div>
+        </form>
+
+        {/* Categories Horizontal Scroll */}
+        <div className="mb-6 relative group">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Categories</span>
+            {category && (
+              <button 
+                onClick={() => { setCategory(''); setPage(1); }} 
+                className="text-xs text-accent hover:underline font-semibold flex items-center gap-1"
+              >
+                Reset Filter
+              </button>
+            )}
+          </div>
+          
+          <div className="relative flex items-center">
+            {/* Left Button */}
+            <button 
+              onClick={() => scroll('left')}
+              className="absolute -left-4 z-10 w-8 h-8 rounded-full bg-white/90 shadow-md border border-slate-100 flex items-center justify-center text-slate-600 hover:text-primary hover:bg-slate-50 transition-all duration-150 opacity-0 group-hover:opacity-100 focus:opacity-100"
+              aria-label="Scroll left"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {/* Scroll Container */}
+            <div 
+              ref={scrollRef}
+              onWheel={(e) => {
+                if (e.deltaY !== 0) {
+                  e.preventDefault();
+                  e.currentTarget.scrollLeft += e.deltaY;
+                }
+              }}
+              className="flex gap-3 overflow-x-auto pb-3 pt-1 -mx-4 px-4 scrollbar-none snap-x snap-mandatory scroll-smooth w-full"
+            >
+              <button
+                onClick={() => { setCategory(''); setPage(1); }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-full border transition-all duration-200 cursor-pointer shrink-0 snap-center text-xs font-semibold ${
+                  !category 
+                    ? 'bg-gradient-to-r from-accent to-violet-600 border-accent/80 text-white shadow-md shadow-accent/10' 
+                    : 'bg-white border-slate-100 text-slate-600 hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm'
+                }`}
+              >
+                <span>🌟</span>
+                <span>All Categories</span>
+              </button>
+              {FAQ_CATEGORIES.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => { setCategory(cat); setPage(1); }}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-full border transition-all duration-200 cursor-pointer shrink-0 snap-center text-xs font-semibold ${
+                    category === cat 
+                      ? 'bg-gradient-to-r from-accent to-violet-600 border-accent/80 text-white shadow-md shadow-accent/10' 
+                      : 'bg-white border-slate-100 text-slate-600 hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm'
+                  }`}
+                >
+                  <span>{categoryIcons[cat] || '📁'}</span>
+                  <span>{cat}</span>
+                </button>
               ))}
             </div>
-          )}
+
+            {/* Right Button */}
+            <button 
+              onClick={() => scroll('right')}
+              className="absolute -right-4 z-10 w-8 h-8 rounded-full bg-white/90 shadow-md border border-slate-100 flex items-center justify-center text-slate-600 hover:text-primary hover:bg-slate-50 transition-all duration-150 opacity-0 group-hover:opacity-100 focus:opacity-100"
+              aria-label="Scroll right"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Sort & Stats Row */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <p className="text-xs text-muted font-medium">
+              Showing <span className="text-primary font-bold">{total}</span> FAQs
+              {category && <span> in <span className="text-accent font-semibold">{category}</span></span>}
+            </p>
+            {isModeratorOrAbove && (
+              <button
+                onClick={() => setReviewOnTop(v => !v)}
+                className={`btn-outline-sm flex items-center gap-1.5 transition-all duration-200 py-1 px-2.5 ${
+                  reviewOnTop 
+                    ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 hover:border-amber-400 font-semibold' 
+                    : 'hover:bg-slate-100 text-muted'
+                }`}
+              >
+                <Flag className={`w-3.5 h-3.5 ${reviewOnTop ? 'fill-amber-500 text-amber-600' : ''}`} />
+                Review on Top
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-muted" />
+            <div className="pill-group bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/40">
+              {sortOptions.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => { setSort(opt.value); setPage(1); }}
+                  className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg transition-all ${
+                    sort === opt.value 
+                      ? 'bg-white text-primary shadow-sm' 
+                      : 'text-muted hover:text-primary'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Conversion Requests Banner */}
+      {isSeniorOrAdmin && conversionRequests.length > 0 && (
+        <div className="card p-4 mb-6 border-l-4 border-l-accent bg-accent-50/30">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-accent-100 flex items-center justify-center">
+              <BookOpen className="w-3.5 h-3.5 text-accent" />
+            </div>
+            <span className="text-sm font-bold text-primary">FAQ Conversion Requests</span>
+            <span className="text-xs font-bold px-2 py-0.5 bg-accent-200 text-accent-800 rounded-full">{conversionRequests.length}</span>
+          </div>
+          <div className="space-y-2">
+            {conversionRequests.map(req => (
+              <div key={req._id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-border/60 text-sm">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-primary truncate">{req.rtqId?.question || 'Unknown RTQ'}</p>
+                  <p className="text-xs text-muted mt-0.5">Requested by {req.requestedBy?.name} — {timeAgo(req.createdAt)}</p>
+                </div>
+                <div className="flex gap-2 ml-4 shrink-0">
+                  <button onClick={() => faqService.approveConversion(req._id).then(load)} className="btn-success-sm text-xs">Approve</button>
+                  <button onClick={() => faqService.rejectConversion(req._id).then(load)} className="btn-outline-sm text-xs">Reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="flex gap-3 mb-6">
-        <input
-          type="search"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search FAQs..."
-          className="input flex-1"
-        />
-        <select
-          value={selectedCategory}
-          onChange={e => setSelectedCategory(e.target.value)}
-          className="input w-auto"
-        >
-          <option value="all">All Categories</option>
-          {FAQ_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={sort} onChange={e => setSort(e.target.value)} className="input w-auto">
-          <option value="upvotes">Most Upvoted</option>
-          <option value="newest">Newest First</option>
-          <option value="oldest">Oldest First</option>
-        </select>
-      </div>
-
+      {/* FAQ List */}
       {loading ? (
-        <div className="space-y-4">
-          {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
+        <div className="flex items-center justify-center py-16">
+          <Spinner size="lg" />
         </div>
+      ) : faqs.length === 0 ? (
+        <EmptyState
+          icon={BookOpen}
+          title="No FAQs found"
+          description={search ? `No results for "${search}". Try a different search term.` : 'The knowledge base is empty. FAQs will appear here as they are published.'}
+          actionLabel={isSeniorOrAdmin ? 'Add FAQ' : undefined}
+          actionTo={isSeniorOrAdmin ? '/add-faq' : undefined}
+        />
       ) : (
         <div className="space-y-8">
-          {filteredCategories.map(category => {
-            const items = sortItems(searchFiltered(grouped[category] || []));
-            if (items.length === 0) return null;
-            const catInfo = getCategoryUpvoteInfo(category);
+          {Object.entries(faqsByCategory).map(([catName, catFaqs]) => {
+            const catInfo = getCategoryUpvoteInfo(catName);
+            const processedFaqs = reviewOnTop
+              ? [
+                  ...catFaqs.filter(f => f.markedForReview),
+                  ...catFaqs.filter(f => !f.markedForReview)
+                ]
+              : catFaqs;
             return (
-              <div key={category}>
-                <div className="flex items-center gap-3 mb-3">
-                  <h2 className="text-sm font-semibold text-muted uppercase tracking-wide">{category}</h2>
-                  <button
-                    id={`category-upvote-${category.replace(/[^a-zA-Z0-9]/g, '-')}`}
-                    onClick={() => handleCategoryUpvote(category)}
-                    className={cn(
-                      'flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all duration-200 border',
-                      catInfo.hasUpvoted
-                        ? 'bg-green-50 text-green-700 border-green-200'
-                        : 'bg-surface text-muted border-border hover:bg-slate-100 hover:text-primary'
-                    )}
-                  >
-                    <ArrowBigUp className={cn('w-3.5 h-3.5', catInfo.hasUpvoted && 'fill-green-600')} />
-                    <span>{catInfo.upvotes}</span>
-                  </button>
+              <div key={catName}>
+                {/* Category Header */}
+                <div className="flex items-center gap-2.5 mb-4">
+                  <h2 className="text-base font-bold text-primary gradient-underline">{catName}</h2>
+                  <span className="text-xs font-semibold px-2 py-0.5 bg-slate-100 text-muted rounded-full">{catFaqs.length}</span>
+                  {catName !== 'Uncategorized' && (
+                    <button
+                      onClick={() => handleCategoryUpvote(catName)}
+                      className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all border ${
+                        catInfo.hasUpvoted
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60 shadow-sm shadow-emerald-50'
+                          : 'bg-white text-muted border-slate-200/60 hover:bg-slate-50 hover:text-primary hover:border-slate-300'
+                      }`}
+                      title={catInfo.hasUpvoted ? 'Remove category upvote' : 'Upvote this category'}
+                    >
+                      <ArrowBigUp className={`w-3.5 h-3.5 ${catInfo.hasUpvoted ? 'fill-emerald-600' : ''}`} />
+                      <span>{catInfo.upvotes}</span>
+                    </button>
+                  )}
                 </div>
+
                 <div className="space-y-3">
-                  {items.map(faq => (
-                    <div key={faq._id} className="card p-5">
-                      <div className="flex gap-4">
-                        <div className="flex flex-col items-center gap-1 min-w-[40px]">
+                  {processedFaqs.map(faq => {
+                    const isExpanded = expandedId === faq._id;
+                    const hasUpvoted = faq.upvotedBy?.some(uid => (uid?._id || uid)?.toString() === user?._id?.toString());
+
+                    return (
+                      <div key={faq._id} className="card card-hover overflow-hidden">
+                        {/* Question Row (always visible) */}
+                        <div
+                          className="flex items-start gap-4 p-5 cursor-pointer select-none"
+                          onClick={() => setExpandedId(isExpanded ? null : faq._id)}
+                        >
                           <UpvoteButton
                             upvotes={faq.upvotes}
                             onUpvote={() => handleUpvote(faq._id)}
-                            hasUpvoted={faq.upvotedBy?.some(id => (id?._id || id)?.toString() === user?._id?.toString())}
+                            hasUpvoted={hasUpvoted}
                           />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <h3 className="font-semibold text-primary">{faq.question}</h3>
-                                {isModeratorOrAbove && faq.markedForReview && (
-                                  <StatusBadge status="markedForReview" />
-                                )}
-                              </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-semibold text-primary leading-snug mb-1.5">{faq.question}</h3>
+                            <div className="flex items-center gap-2 flex-wrap text-xs text-muted">
+                              {faq.addedBy && (
+                                <span className="flex items-center gap-1">
+                                  <Avatar name={faq.addedBy.name} role={faq.addedBy.role} size="xs" />
+                                  {faq.addedBy.name}
+                                </span>
+                              )}
+                              <span>&middot;</span>
+                              <span>{timeAgo(faq.createdAt)}</span>
+                              <span>&middot;</span>
+                              <span className="flex items-center gap-0.5"><Eye className="w-3 h-3" />{faq.views || 0}</span>
                             </div>
-                            {isModeratorOrAbove && (
-                              <div className="relative shrink-0">
-                                <button
-                                  onClick={() => setActiveFAQSettingsId(activeFAQSettingsId === faq._id ? null : faq._id)}
-                                  className="p-1 rounded hover:bg-slate-100 text-muted hover:text-primary transition-colors duration-200"
-                                  title="Moderator Actions"
-                                >
-                                  <Settings className="w-4 h-4" />
-                                </button>
-                                {activeFAQSettingsId === faq._id && (
-                                  <div className="absolute right-0 mt-1 w-48 bg-white border border-border rounded-lg shadow-lg z-20 py-1">
-                                    <button
-                                      onClick={() => {
-                                        handleReviewFAQ(faq._id);
-                                        setActiveFAQSettingsId(null);
-                                      }}
-                                      className="w-full text-left px-3 py-2 text-xs text-amber-600 hover:bg-amber-50 font-semibold flex items-center gap-1.5"
-                                    >
-                                      ⚠️ {faq.markedForReview ? 'Remove Flag' : 'Flag for Review'}
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        handleToggleTrendingFAQ(faq._id);
-                                        setActiveFAQSettingsId(null);
-                                      }}
-                                      className="w-full text-left px-3 py-2 text-xs text-primary hover:bg-slate-50 font-semibold flex items-center gap-1.5"
-                                    >
-                                      ⭐ {faq.isTrending ? 'Remove Trending' : 'Set on Trending'}
-                                    </button>
-                                    {isSenior && (
-                                      <>
-                                        <div className="border-t border-border my-1"></div>
-                                        <button
-                                          onClick={() => {
-                                            navigate(`/faq/edit/${faq._id}`);
-                                            setActiveFAQSettingsId(null);
-                                          }}
-                                          className="w-full text-left px-3 py-2 text-xs text-primary hover:bg-slate-50 font-semibold"
-                                        >
-                                          Edit FAQ
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            handleDelete(faq._id);
-                                            setActiveFAQSettingsId(null);
-                                          }}
-                                          className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 font-semibold"
-                                        >
-                                          Delete FAQ
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                )}
+                            {faq.tags?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {faq.tags.map(tag => (
+                                  <span key={tag} className="text-xs bg-accent-50 text-accent-600 px-2 py-0.5 rounded-md font-medium">{tag}</span>
+                                ))}
                               </div>
                             )}
                           </div>
-                          <p className="text-sm text-muted mb-3">{faq.answer}</p>
-                          <div className="flex items-center gap-3 text-xs text-muted">
-                            <span>By {faq.createdBy?.name}</span>
-                            <span>•</span>
-                            <span>{timeAgo(faq.createdAt)}</span>
+                          <div className="flex items-center gap-2 shrink-0">
                             {faq.isTrending && (
-                              <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">Trending</span>
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-orange-50 text-orange-600 rounded-lg font-semibold border border-orange-200">
+                                🔥 Trending
+                              </span>
+                            )}
+                            {faq.markedForReview && (
+                              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-amber-50 text-amber-600 rounded-lg font-semibold border border-amber-200">
+                                ⚠ Review
+                              </span>
+                            )}
+                            <div className="text-muted transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)' }}>
+                              <ChevronDown className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expandable Answer */}
+                        <div className={`accordion-content ${isExpanded ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                          <div className="px-5 pb-5 pt-0 border-t border-border/50">
+                            <div className="bg-slate-50/50 rounded-xl p-4 mt-3">
+                              <p className="text-sm text-primary leading-relaxed whitespace-pre-wrap">{faq.answer}</p>
+                            </div>
+
+                            {/* Mod Actions */}
+                            {isModeratorOrAbove && (
+                              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border/50">
+                                {isSeniorOrAdmin && (
+                                  <>
+                                    <Link to={`/faq/edit/${faq._id}`} className="btn-icon-sm" title="Edit FAQ">
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </Link>
+                                    <button onClick={() => handleDelete(faq._id)} className="btn-icon-sm hover:!text-red-500 hover:!bg-red-50" title="Delete FAQ">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                                <button
+                                  onClick={() => handleToggleTrending(faq._id)}
+                                  className={`btn-icon-sm ${faq.isTrending ? '!text-orange-500 !bg-orange-50' : ''}`}
+                                  title={faq.isTrending ? 'Remove trending' : 'Mark trending'}
+                                >
+                                  <TrendingIcon className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleToggleReview(faq._id)}
+                                  className={`btn-icon-sm ${faq.markedForReview ? '!text-amber-500 !bg-amber-50' : ''}`}
+                                  title={faq.markedForReview ? 'Unmark review' : 'Flag for review'}
+                                >
+                                  <Flag className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
-          {Object.keys(grouped).length === 0 && !loading && (
-            <div className="text-center py-12 text-muted">No FAQs found.</div>
-          )}
         </div>
       )}
 
-      {total > limit && (
-        <div className="flex items-center justify-center gap-2 mt-8">
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-8 pt-6 border-t border-border/50">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="btn-secondary text-sm px-3 py-1.5"
+            className="btn-outline-sm disabled:opacity-40"
           >
-            ← Prev
+            Previous
           </button>
-          <span className="text-sm text-muted">Page {page}</span>
+          {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+            let pageNum;
+            if (totalPages <= 7) pageNum = i + 1;
+            else if (page <= 4) pageNum = i + 1;
+            else if (page >= totalPages - 3) pageNum = totalPages - 6 + i;
+            else pageNum = page - 3 + i;
+            return (
+              <button
+                key={pageNum}
+                onClick={() => setPage(pageNum)}
+                className={`w-9 h-9 rounded-xl text-sm font-semibold transition-all ${
+                  page === pageNum
+                    ? 'bg-accent text-white shadow-sm'
+                    : 'text-muted hover:bg-slate-100'
+                }`}
+              >
+                {pageNum}
+              </button>
+            );
+          })}
           <button
-            onClick={() => setPage(p => Math.min(Math.ceil(total / limit), p + 1))}
-            disabled={page >= Math.ceil(total / limit)}
-            className="btn-secondary text-sm px-3 py-1.5"
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="btn-outline-sm disabled:opacity-40"
           >
-            Next →
+            Next
           </button>
         </div>
       )}
 
       <BackToTop />
+      <LoginModal isOpen={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
     </div>
   );
 }

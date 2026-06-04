@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useQP } from '../context/QPContext';
 import notificationService from '../services/notification.service';
 import { timeAgo } from '../utils/helpers';
-import { Bell, LogOut } from 'lucide-react';
+import { Bell, LogOut, Menu, X, Zap } from 'lucide-react';
+import Avatar from './Avatar';
 
 export default function Nav({ refreshUser }) {
   const { user, logout } = useAuth();
@@ -14,9 +15,13 @@ export default function Nav({ refreshUser }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [recentNotifs, setRecentNotifs] = useState([]);
   const [bellOpen, setBellOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [qpAnimate, setQpAnimate] = useState(false);
   const prevQpRef = useRef(qp);
   const bellRef = useRef(null);
+
+  // Close mobile menu on route change
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
   useEffect(() => {
     if (prevQpRef.current !== qp && user) {
@@ -95,63 +100,74 @@ export default function Nav({ refreshUser }) {
     { to: '/faq', label: 'FAQs' },
     { to: '/rtq', label: 'RTQ' },
     ...(user?.role === 'student' || user?.role === 'moderator'
-      ? [{ to: '/raise-question', label: 'Ask' }]
+      ? [{ to: '/track', label: 'Track' }, { to: '/raise-question', label: 'Ask' }]
       : []),
     ...(user?.role === 'senior' || user?.role === 'admin'
       ? [{ to: '/add-faq', label: 'Add FAQ' }, { to: '/history', label: 'History' }]
       : []),
     { to: '/users', label: 'Users' },
-    { to: '/profile', label: 'Profile' },
   ];
 
   return (
-    <nav className="bg-white/80 backdrop-blur-md border-b border-border sticky top-0 z-50">
+    <nav className="bg-white/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14">
-        <div className="flex items-center gap-0.5">
+        {/* Left: Brand + Desktop Links */}
+        <div className="flex items-center gap-1">
           <Link
-            to="/dashboard"
-            className="brand-font text-primary mr-6 text-xl tracking-tight hover:opacity-70 transition-opacity font-bold"
+            to="/about"
+            className="flex items-center gap-2 mr-5 hover:opacity-80 transition-opacity"
           >
-            PippaQ
+            <img src="/PippaQ1.webp" alt="PippaQ Logo" className="w-7 h-7 object-contain" />
+            <span className="font-brand text-gradient text-xl tracking-tight font-bold">
+              PippaQ
+            </span>
           </Link>
-          {navLinks.map(link => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                isActive(link.to)
-                  ? 'bg-primary/10 text-primary font-semibold'
-                  : 'text-muted hover:text-primary hover:bg-slate-100'
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {/* Desktop nav links */}
+          <div className="hidden md:flex items-center gap-0.5">
+            {navLinks.map(link => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className={`relative px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  isActive(link.to)
+                    ? 'text-accent-600 bg-accent-50/70 font-semibold'
+                    : 'text-muted hover:text-primary hover:bg-slate-50'
+                }`}
+              >
+                {link.label}
+                {isActive(link.to) && (
+                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-gradient-to-r from-accent to-violet-500" />
+                )}
+              </Link>
+            ))}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1.5">
+          {/* Notification Bell */}
           <div className="relative" ref={bellRef}>
             <button
               onClick={() => setBellOpen(v => !v)}
-              className="relative p-2 rounded-lg text-muted hover:text-primary hover:bg-slate-100 transition-colors"
+              className="relative p-2 rounded-xl text-muted hover:text-primary hover:bg-slate-100 transition-all duration-150"
               title="Notifications"
             >
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                <span className="absolute -top-0.5 -right-0.5 bg-gradient-to-r from-red-500 to-rose-500 text-white text-[10px] font-bold rounded-full w-4.5 h-4.5 flex items-center justify-center leading-none shadow-sm min-w-[18px] h-[18px]">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
 
             {bellOpen && (
-              <div className="dropdown absolute right-0 top-full mt-2 w-80 animate-in z-50">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div className="dropdown absolute right-0 top-full mt-2 w-80 animate-slideDown z-50">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
                   <span className="text-sm font-semibold text-primary">Notifications</span>
                   {unreadCount > 0 && (
                     <button
                       onClick={handleMarkAllRead}
-                      className="text-xs text-primary hover:underline font-medium"
+                      className="text-xs text-accent hover:underline font-medium"
                     >
                       Mark all read
                     </button>
@@ -159,26 +175,31 @@ export default function Nav({ refreshUser }) {
                 </div>
                 <div className="max-h-72 overflow-y-auto">
                   {recentNotifs.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-sm text-muted">No notifications yet</div>
+                    <div className="px-4 py-8 text-center text-sm text-muted">No notifications yet</div>
                   ) : (
                     recentNotifs.map(notif => (
                       <div
                         key={notif._id}
-                        className={`px-4 py-3 border-b border-border last:border-0 hover:bg-slate-50 cursor-pointer transition-colors ${
-                          !notif.read ? 'bg-primary/[0.03]' : 'opacity-70'
+                        className={`px-4 py-3 border-b border-border/30 last:border-0 hover:bg-slate-50 cursor-pointer transition-colors ${
+                          !notif.read ? 'bg-accent-50/30' : 'opacity-60'
                         }`}
                         onClick={() => { setBellOpen(false); navigate('/notifications'); }}
                       >
-                        <p className="text-sm text-primary leading-snug">{notif.message}</p>
-                        <p className="text-xs text-muted mt-0.5">{timeAgo(notif.createdAt)}</p>
+                        <div className="flex items-start gap-2">
+                          {!notif.read && <div className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-primary leading-snug">{notif.message}</p>
+                            <p className="text-xs text-muted mt-0.5">{timeAgo(notif.createdAt)}</p>
+                          </div>
+                        </div>
                       </div>
                     ))
                   )}
                 </div>
-                <div className="px-4 py-2.5 border-t border-border bg-slate-50/50">
+                <div className="px-4 py-2.5 border-t border-border/50 bg-slate-50/30">
                   <button
                     onClick={() => { setBellOpen(false); navigate('/notifications'); }}
-                    className="text-xs text-primary hover:underline font-medium w-full text-center"
+                    className="text-xs text-accent hover:underline font-semibold w-full text-center"
                   >
                     View all notifications
                   </button>
@@ -187,25 +208,87 @@ export default function Nav({ refreshUser }) {
             )}
           </div>
 
-          <div className={`text-sm font-semibold px-2.5 py-1 rounded-lg transition-all duration-300 ${
-            qpAnimate
-              ? 'bg-emerald-100 text-emerald-700 scale-105'
-              : 'text-primary bg-slate-100'
-          }`}>
+          {/* QP Badge */}
+          <button
+            onClick={() => navigate('/qp-history')}
+            className={`hidden sm:flex items-center gap-1 text-sm font-bold px-2.5 py-1 rounded-lg transition-all duration-300 hover:opacity-80 cursor-pointer ${
+              qpAnimate
+                ? 'qp-glow bg-accent-100 text-accent-700'
+                : 'bg-gradient-to-r from-accent-50 to-violet-50 text-accent-700 border border-accent-200/50'
+            }`}
+            title="View QP History"
+          >
+            <Zap className="w-3.5 h-3.5 fill-accent-500 text-accent-500" />
             {qp} QP
-          </div>
+          </button>
 
-          <div className="text-xs text-muted px-1">@{user?.username}</div>
+          {/* User info */}
+          <Link to="/profile" className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-50 transition-colors">
+            <Avatar name={user?.name} role={user?.role} size="xs" />
+            <span className="text-xs text-muted font-medium">@{user?.username}</span>
+          </Link>
 
+          {/* Logout */}
           <button
             onClick={handleLogout}
-            className="btn-ghost text-xs px-3 py-1.5 flex items-center gap-1.5"
+            className="hidden sm:flex btn-ghost text-xs px-2.5 py-1.5 items-center gap-1.5"
           >
             <LogOut className="w-3.5 h-3.5" />
-            Logout
+          </button>
+
+          {/* Mobile hamburger */}
+          <button
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="md:hidden p-2 rounded-xl text-muted hover:text-primary hover:bg-slate-100 transition-colors"
+          >
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
+
+      {/* Mobile Menu Panel */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-border/50 bg-white/95 backdrop-blur-xl animate-slideDown">
+          <div className="max-w-6xl mx-auto px-4 py-3 space-y-1">
+            {navLinks.map(link => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className={`block px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+                  isActive(link.to)
+                    ? 'text-accent-600 bg-accent-50/70 font-semibold'
+                    : 'text-muted hover:text-primary hover:bg-slate-50'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="divider my-2" />
+            <div className="flex items-center justify-between px-3 py-2">
+              <Link to="/profile" className="flex items-center gap-2 hover:opacity-80 transition-all duration-150">
+                <Avatar name={user?.name} role={user?.role} size="sm" />
+                <div>
+                  <p className="text-sm font-medium text-primary leading-tight">{user?.name}</p>
+                  <p className="text-xs text-muted">@{user?.username}</p>
+                </div>
+              </Link>
+              <button
+                onClick={() => navigate('/qp-history')}
+                className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-gradient-to-r from-accent-50 to-violet-50 text-accent-700 border border-accent-200/50 hover:opacity-85 transition-all duration-150"
+              >
+                <Zap className="w-3.5 h-3.5 fill-accent-500 text-accent-500" />
+                {qp} QP
+              </button>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" /> Sign out
+            </button>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

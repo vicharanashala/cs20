@@ -22,11 +22,18 @@ import UserProfilePage from './pages/UserProfilePage';
 import TrackQuestionPage from './pages/TrackQuestionPage';
 import WorkingHistoryPage from './pages/WorkingHistoryPage';
 import NotificationsPage from './pages/NotificationsPage';
+import QPHistoryPage from './pages/QPHistoryPage';
+import AboutPage from './pages/AboutPage';
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface">
-      <div className="text-muted">Loading...</div>
+    <div className="min-h-screen flex items-center justify-center bg-mesh">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-violet-600 flex items-center justify-center animate-pulse">
+          <span className="text-white font-brand font-bold text-lg">P</span>
+        </div>
+        <div className="text-muted text-sm font-medium">Loading...</div>
+      </div>
     </div>
   );
 }
@@ -56,12 +63,19 @@ function DashboardRoute() {
   return <StudentDashboard />;
 }
 
-const PUBLIC_PATHS = ['/login', '/signup'];
+
+// Scroll to top on route change
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 
 function AppLayout() {
   const location = useLocation();
   const { user, refreshUser } = useAuth();
-  const isPublic = PUBLIC_PATHS.includes(location.pathname);
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
@@ -77,27 +91,32 @@ function AppLayout() {
 
   return (
     <div className="min-h-screen bg-surface">
-      {user && !isPublic && <Nav refreshUser={refreshUser} />}
+      <ScrollToTop />
+      {user && !['/login', '/signup'].includes(location.pathname) && <Nav refreshUser={refreshUser} />}
       {searchOpen && <GlobalSearch onClose={() => setSearchOpen(false)} />}
-      <Routes>
-        <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
-        <Route path="/signup" element={<PublicOnly><SignupPage /></PublicOnly>} />
-        <Route path="/dashboard" element={<DashboardRoute />} />
-        <Route path="/faq" element={<ProtectedRoute><FAQPage /></ProtectedRoute>} />
-        <Route path="/faq/edit/:id" element={<ProtectedRoute allowedRoles={['senior', 'admin']}><FAQEditPage /></ProtectedRoute>} />
-        <Route path="/rtq" element={<ProtectedRoute><RTQPage /></ProtectedRoute>} />
-        <Route path="/rtq/:id" element={<ProtectedRoute><RTQDetailPage /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/users" element={<ProtectedRoute><UserListPage /></ProtectedRoute>} />
-        <Route path="/users/:id" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
-        <Route path="/track" element={<ProtectedRoute><TrackQuestionPage /></ProtectedRoute>} />
-        <Route path="/history" element={<ProtectedRoute><WorkingHistoryPage /></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-        <Route path="/raise-question" element={<ProtectedRoute allowedRoles={['student', 'moderator']}><RaiseQuestionPage /></ProtectedRoute>} />
-        <Route path="/add-faq" element={<ProtectedRoute allowedRoles={['senior', 'admin']}><AddFAQPage /></ProtectedRoute>} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <div key={location.pathname} className="page-enter">
+        <Routes>
+          <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
+          <Route path="/signup" element={<PublicOnly><SignupPage /></PublicOnly>} />
+          <Route path="/dashboard" element={<DashboardRoute />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/faq/edit/:id" element={<ProtectedRoute allowedRoles={['senior', 'admin']}><FAQEditPage /></ProtectedRoute>} />
+          <Route path="/rtq" element={<ProtectedRoute><RTQPage /></ProtectedRoute>} />
+          <Route path="/rtq/:id" element={<ProtectedRoute><RTQDetailPage /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/users" element={<ProtectedRoute><UserListPage /></ProtectedRoute>} />
+          <Route path="/users/:id" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
+          <Route path="/track" element={<ProtectedRoute allowedRoles={['student', 'moderator']}><TrackQuestionPage /></ProtectedRoute>} />
+          <Route path="/history" element={<ProtectedRoute><WorkingHistoryPage /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/qp-history" element={<ProtectedRoute><QPHistoryPage /></ProtectedRoute>} />
+          <Route path="/raise-question" element={<ProtectedRoute allowedRoles={['student', 'moderator']}><RaiseQuestionPage /></ProtectedRoute>} />
+          <Route path="/add-faq" element={<ProtectedRoute allowedRoles={['senior', 'admin']}><AddFAQPage /></ProtectedRoute>} />
+          <Route path="/" element={<Navigate to="/faq" replace />} />
+          <Route path="*" element={<Navigate to="/faq" replace />} />
+        </Routes>
+      </div>
     </div>
   );
 }
