@@ -1643,6 +1643,6 @@ npm run server
 3. On next server restart, the user will be auto-promoted to `admin` role
 4. The admin can then manage the email whitelist and approve other users
 
----
+--- --
 
 *Built with ❤️ using React, Express, MongoDB & Qdrant — by the Vicharanashala Team*
