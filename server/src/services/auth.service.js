@@ -118,7 +118,8 @@ export async function verifyOTP(userId, otp) {
   user.emailOtpExpires = undefined;
   await user.save();
   await awardQP(user._id, 100, 'Welcome bonus - Account activated');
-  return { user };
+  const updatedUser = await User.findById(userId);
+  return { user: updatedUser };
 }
 
 export async function loginUser(email, password) {

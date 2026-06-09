@@ -31,6 +31,13 @@ export default function RTQDetailPage() {
     category: '',
     tags: ''
   });
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestModalData, setRequestModalData] = useState({
+    rtqId: '',
+    question: '',
+    suggestedAnswer: ''
+  });
 
   const load = async () => {
     setLoading(true);
@@ -270,14 +277,54 @@ export default function RTQDetailPage() {
     }
   };
 
-  const handleRequestConversion = async () => {
-    const suggested = prompt('Optionally enter a suggested answer (or leave blank to use the top-voted answer):');
-    if (suggested === null) return;
+  const handleInitiateRequest = () => {
+    const answers = [...(rtq.answers || [])].sort((a, b) => b.upvotes - a.upvotes);
+    let selectedAns = null;
+
+    // 1. Senior's own answer (or in this case, moderator's own answer)
+    selectedAns = answers.find(ans => 
+      (ans.userId?._id || ans.userId)?.toString() === user?._id?.toString()
+    );
+
+    // 2. Senior-approved answer
+    if (!selectedAns) {
+      selectedAns = answers.find(ans => 
+        ans.approvals?.some(u => u.role === 'senior' || u.role === 'admin')
+      );
+    }
+
+    // 3. Moderator-approved answer
+    if (!selectedAns) {
+      selectedAns = answers.find(ans => 
+        ans.approvals?.some(u => u.role === 'moderator')
+      );
+    }
+
+    // 4. Most upvoted
+    if (!selectedAns && answers.length > 0) {
+      selectedAns = answers[0];
+    }
+
+    setRequestModalData({
+      rtqId: rtq._id,
+      question: rtq.question,
+      suggestedAnswer: selectedAns ? selectedAns.answer : ''
+    });
+    setShowRequestModal(true);
+  };
+
+  const handleConfirmRequest = async () => {
+    if (!requestModalData.suggestedAnswer?.trim()) return;
+    setSubmittingRequest(true);
     try {
-      await faqService.requestConversion(id, suggested || undefined);
+      await faqService.requestConversion(id, requestModalData.suggestedAnswer);
+      setShowRequestModal(false);
       alert('FAQ conversion request submitted to admin for review.');
+      load();
     } catch (err) {
       alert(err.message || 'Failed to submit conversion request');
+    } finally {
+      setSubmittingRequest(false);
     }
   };
 
@@ -418,7 +465,7 @@ export default function RTQDetailPage() {
 
               {user?.role === 'moderator' && (
                 <button
-                  onClick={handleRequestConversion}
+                  onClick={handleInitiateRequest}
                   className="p-1.5 border border-blue-200 text-blue-600 rounded hover:bg-blue-50 transition-colors ml-auto"
                   title="Request FAQ Conversion (Admin will review)"
                 >
@@ -659,6 +706,44 @@ export default function RTQDetailPage() {
                 disabled={submittingFaq || !faqModalData.answer?.trim() || !faqModalData.category}
               >
                 {submittingFaq ? <Spinner size="sm" /> : 'Confirm Add to FAQ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showRequestModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all duration-300">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 border border-slate-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-primary mb-2 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600" /> Request FAQ Conversion
+            </h3>
+            <p className="text-xs text-muted mb-4">
+              Suggest this question and answer to be added to the FAQ database. An Admin or Senior will review it.
+            </p>
+            <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+              <div>
+                <label className="block text-xs font-semibold text-primary mb-1 uppercase tracking-wider">Question</label>
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-semibold text-primary">
+                  {requestModalData.question}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-primary mb-1 uppercase tracking-wider">Suggested Answer</label>
+                <textarea
+                  value={requestModalData.suggestedAnswer}
+                  onChange={e => setRequestModalData(prev => ({ ...prev, suggestedAnswer: e.target.value }))}
+                  className="input w-full resize-none font-sans text-sm leading-relaxed" rows={6}
+                  placeholder="Review and polish the suggested answer..."
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-border">
+              <button onClick={() => setShowRequestModal(false)} className="btn-secondary text-sm px-4 py-2" disabled={submittingRequest}>Cancel</button>
+              <button
+                onClick={handleConfirmRequest} className="btn-primary text-sm px-4 py-2 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={submittingRequest || !requestModalData.suggestedAnswer?.trim()}
+              >
+                {submittingRequest ? <Spinner size="sm" /> : 'Confirm Request'}
               </button>
             </div>
           </div>

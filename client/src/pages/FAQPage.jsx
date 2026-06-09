@@ -82,13 +82,20 @@ export default function FAQPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
+  const loadConversionRequests = useCallback(async () => {
     if (isSeniorOrAdmin) {
-      faqService.getConversionRequests?.()
-        .then(setConversionRequests)
-        .catch(() => {});
+      try {
+        const data = await faqService.listConversionRequests('pending');
+        setConversionRequests(data || []);
+      } catch (err) {
+        console.error(err);
+      }
     }
   }, [isSeniorOrAdmin]);
+
+  useEffect(() => {
+    loadConversionRequests();
+  }, [loadConversionRequests]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -169,6 +176,28 @@ export default function FAQPage() {
     try {
       await faqService.reviewFAQ(faqId);
     } catch { setFaqs(prev); }
+  };
+
+  const handleApproveConversion = async (id) => {
+    try {
+      await faqService.approveConversionRequest(id);
+      await loadConversionRequests();
+      await load();
+    } catch (err) {
+      alert(err.message || 'Failed to approve conversion request');
+    }
+  };
+
+  const handleRejectConversion = async (id) => {
+    const note = prompt('Enter rejection note (optional):');
+    if (note === null) return; // user cancelled
+    try {
+      await faqService.rejectConversionRequest(id, note || undefined);
+      await loadConversionRequests();
+      await load();
+    } catch (err) {
+      alert(err.message || 'Failed to reject conversion request');
+    }
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -355,12 +384,12 @@ export default function FAQPage() {
             {conversionRequests.map(req => (
               <div key={req._id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-border/60 text-sm">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-primary truncate">{req.rtqId?.question || 'Unknown RTQ'}</p>
+                  <p className="font-medium text-primary truncate">{req.rtqQuestion || req.rtqId?.question || 'Unknown RTQ'}</p>
                   <p className="text-xs text-muted mt-0.5">Requested by {req.requestedBy?.name} — {timeAgo(req.createdAt)}</p>
                 </div>
                 <div className="flex gap-2 ml-4 shrink-0">
-                  <button onClick={() => faqService.approveConversion(req._id).then(load)} className="btn-success-sm text-xs">Approve</button>
-                  <button onClick={() => faqService.rejectConversion(req._id).then(load)} className="btn-outline-sm text-xs">Reject</button>
+                  <button onClick={() => handleApproveConversion(req._id)} className="btn-success-sm text-xs">Approve</button>
+                  <button onClick={() => handleRejectConversion(req._id)} className="btn-outline-sm text-xs">Reject</button>
                 </div>
               </div>
             ))}

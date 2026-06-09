@@ -11,6 +11,7 @@ import EmailWhitelist from '../models/EmailWhitelist.model.js';
 import AccessRequest from '../models/AccessRequest.model.js';
 import User from '../models/User.model.js';
 import { notifyUser } from '../services/notification.service.js';
+import { awardQP } from '../services/qp.service.js';
 
 export async function getWhitelist(req, res) {
   try {
@@ -93,6 +94,8 @@ export async function approveAccessRequest(req, res) {
       role: 'student',
       status: 'active'
     });
+
+    await awardQP(user._id, 100, 'Welcome bonus - Account activated');
 
     await EmailWhitelist.create({
       email: request.email.toLowerCase(),

@@ -2,6 +2,7 @@ import User from '../models/User.model.js';
 import FAQ from '../models/FAQ.model.js';
 import RoleRequest from '../models/RoleRequest.model.js';
 import { notifyUser } from '../services/notification.service.js';
+import { awardQP } from '../services/qp.service.js';
 import bcrypt from 'bcryptjs';
 
 export async function getUsers(req, res) {
@@ -46,10 +47,13 @@ export async function addUser(req, res) {
       status: 'active'
     });
 
+    await awardQP(user._id, 100, 'Welcome bonus - Account activated');
+    const updatedUser = await User.findById(user._id);
+
     await notifyUser(user._id, user.role, 'account_created_by_admin',
       'Your account was created by an admin. You can now login.', 0);
 
-    const safeUser = user.toJSON();
+    const safeUser = updatedUser.toJSON();
     res.status(201).json(safeUser);
   } catch (err) {
     console.error(err);
@@ -203,8 +207,11 @@ export async function approveUser(req, res) {
     user.updatedAt = new Date();
     await user.save();
 
-    await notifyUser(userId, user.role, 'account_approved', 'Your account has been approved!', 0);
-    res.json({ message: 'User approved', user: user.toJSON() });
+    await awardQP(user._id, 100, 'Welcome bonus - Account activated');
+    const updatedUser = await User.findById(userId);
+
+    await notifyUser(userId, updatedUser.role, 'account_approved', 'Your account has been approved!', 0);
+    res.json({ message: 'User approved', user: updatedUser.toJSON() });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -259,6 +266,7 @@ export async function approveRoleRequest(req, res) {
         role: request.requestedRole,
         status: 'active'
       });
+      await awardQP(user._id, 100, 'Welcome bonus - Account activated');
     } else {
       user.name = request.name;
       user.username = request.username;
@@ -271,15 +279,17 @@ export async function approveRoleRequest(req, res) {
       await user.save();
     }
 
+    const updatedUser = await User.findById(user._id);
+
     request.status = 'approved';
     request.reviewedAt = new Date();
     request.reviewedBy = req.user._id;
     await request.save();
 
-    await notifyUser(user._id, user.role, 'reaccess_approved',
+    await notifyUser(updatedUser._id, updatedUser.role, 'reaccess_approved',
       'Your re-access request has been approved. You can now login.', 0);
 
-    res.json({ message: 'Role request approved', user: user.toJSON() });
+    res.json({ message: 'Role request approved', user: updatedUser.toJSON() });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
